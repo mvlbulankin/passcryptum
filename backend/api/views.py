@@ -4,8 +4,8 @@ import base64
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
-from drf_spectacular.types import OpenApiTypes
+# from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
+# from drf_spectacular.types import OpenApiTypes
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
@@ -14,21 +14,21 @@ from .serializers import UserServicesSerializer, ServicesSerializer
 
 
 class UserServicesView(APIView):
-    @extend_schema(
-        summary="Upload user services",
-        description="Upload user services",
-        request=UserServicesSerializer,
-        responses={
-            200: OpenApiResponse(description="Services have been uploaded to server successfully"),
-            400: OpenApiResponse(description="Validation error"),
-            403: OpenApiResponse(description="Public key not found. Please contact the administrator to register your public key"),
-            500: OpenApiResponse(description="Internal server error"),
-        },
-        parameters=[
-            OpenApiParameter(name='Public-Key', type=OpenApiTypes.STR, description='Public key (Base64 encoded)'),
-            OpenApiParameter(name='body', type=OpenApiTypes.STR, description='Body (Base64 encoded)'),
-        ]
-    )
+    # @extend_schema(
+    #     summary="Upload user services",
+    #     description="Upload user services",
+    #     request=UserServicesSerializer,
+    #     responses={
+    #         200: OpenApiResponse(description="Services have been uploaded to server successfully"),
+    #         400: OpenApiResponse(description="Validation error"),
+    #         403: OpenApiResponse(description="Public key not found. Please contact the administrator to register your public key"),
+    #         500: OpenApiResponse(description="Internal server error"),
+    #     },
+    #     parameters=[
+    #         OpenApiParameter(name='Public-Key', type=OpenApiTypes.STR, description='Public key (Base64 encoded)'),
+    #         OpenApiParameter(name='body', type=OpenApiTypes.STR, description='Body (Base64 encoded)'),
+    #     ]
+    # )
     def post(self, request):
         public_key = request.headers.get('Public-Key')
         encoded_data = request.body
@@ -84,23 +84,23 @@ class UserServicesView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-    @extend_schema(
-        summary="Get user services",
-        description="Get user services",
-        request=UserServicesSerializer,
-        responses={
-            200: OpenApiResponse(response=ServicesSerializer, description="Get user services"),
-            204: OpenApiResponse(description="Services not found on server"),
-            400: OpenApiResponse(description="Validation error"),
-            403: OpenApiResponse(description="Public key not found. Please contact the administrator to register your public key"),
-            500: OpenApiResponse(description="Internal server error"),
-        },
-        parameters=[
-            OpenApiParameter(name='Public-Key', type=OpenApiTypes.STR, description='Public key (Base64 encoded)'),
-            OpenApiParameter(name='Timestamp', type=OpenApiTypes.STR, description='Timestamp (Base64 encoded)'),
-            OpenApiParameter(name='Signature', type=OpenApiTypes.STR, description='Signature (Base64 encoded)'),
-        ]
-    )
+    # @extend_schema(
+    #     summary="Get user services",
+    #     description="Get user services",
+    #     request=UserServicesSerializer,
+    #     responses={
+    #         200: OpenApiResponse(response=ServicesSerializer, description="Get user services"),
+    #         204: OpenApiResponse(description="Services not found on server"),
+    #         400: OpenApiResponse(description="Validation error"),
+    #         403: OpenApiResponse(description="Public key not found. Please contact the administrator to register your public key"),
+    #         500: OpenApiResponse(description="Internal server error"),
+    #     },
+    #     parameters=[
+    #         OpenApiParameter(name='Public-Key', type=OpenApiTypes.STR, description='Public key (Base64 encoded)'),
+    #         OpenApiParameter(name='Timestamp', type=OpenApiTypes.STR, description='Timestamp (Base64 encoded)'),
+    #         OpenApiParameter(name='Signature', type=OpenApiTypes.STR, description='Signature (Base64 encoded)'),
+    #     ]
+    # )
     def get(self, request):
         public_key = request.headers.get('Public-Key')
         encoded_timestamp = request.headers.get('Timestamp')
@@ -155,23 +155,23 @@ class UserServicesView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-    @extend_schema(
-        summary="Delete user services",
-        description="Delete user services",
-        request=UserServicesSerializer,
-        responses={
-            200: OpenApiResponse(description="Services have been deleted successfully"),
-            204: OpenApiResponse(description="Services had already been deleted from server"),
-            400: OpenApiResponse(description="Validation error"),
-            403: OpenApiResponse(description="Public key not found. Please contact the administrator to register your public key"),
-            500: OpenApiResponse(description="Internal server error"),
-        },
-        parameters=[
-            OpenApiParameter(name='Public-Key', type=OpenApiTypes.STR, description='Public key (Base64 encoded)'),
-            OpenApiParameter(name='Timestamp', type=OpenApiTypes.STR, description='Timestamp (Base64 encoded)'),
-            OpenApiParameter(name='Signature', type=OpenApiTypes.STR, description='Signature (Base64 encoded)'),
-        ]
-    )
+    # @extend_schema(
+    #     summary="Delete user services",
+    #     description="Delete user services",
+    #     request=UserServicesSerializer,
+    #     responses={
+    #         200: OpenApiResponse(description="Services have been deleted successfully"),
+    #         204: OpenApiResponse(description="Services had already been deleted from server"),
+    #         400: OpenApiResponse(description="Validation error"),
+    #         403: OpenApiResponse(description="Public key not found. Please contact the administrator to register your public key"),
+    #         500: OpenApiResponse(description="Internal server error"),
+    #     },
+    #     parameters=[
+    #         OpenApiParameter(name='Public-Key', type=OpenApiTypes.STR, description='Public key (Base64 encoded)'),
+    #         OpenApiParameter(name='Timestamp', type=OpenApiTypes.STR, description='Timestamp (Base64 encoded)'),
+    #         OpenApiParameter(name='Signature', type=OpenApiTypes.STR, description='Signature (Base64 encoded)'),
+    #     ]
+    # )
     def delete(self, request):
         public_key = request.headers.get('Public-Key')
         encoded_timestamp = request.headers.get('Timestamp')

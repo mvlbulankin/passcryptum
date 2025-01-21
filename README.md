@@ -20,12 +20,17 @@ sudo vim /etc/nginx/sites-enabled/default
 
 ```text
 server {
-
-  listen 80;
-  server_name public_ip_of_your_remote_server;
-
-  location / {
-    proxy_pass http://127.0.0.1:8000;
+    
+  listen 443 ssl;
+  server_name 193.233.20.79 passcryptum.ddns.net;
+  
+  ssl_certificate /etc/letsencrypt/live/passcryptum.ddns.net/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/passcryptum.ddns.net/privkey.pem;
+  include /etc/letsencrypt/options-ssl-nginx.conf;
+  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+  
+  location /api/userservices/ {
+      proxy_pass http://127.0.0.1:8000;
   }
 
 }
@@ -51,14 +56,12 @@ sudo apt install docker-compose-plugin
 ```text
 .env example:
 
-POSTGRES_USER=user_example
+DB_HOST=db
+DB_PORT=5432
+POSTGRES_DB=django
+POSTGRES_USER=django
 POSTGRES_PASSWORD=pass_example
-POSTGRES_DB=db_example
-DB_HOST=host_example
-DB_PORT=port_example
 SECRET_KEY=key_example
-HTTP_HOST=http://example.com
-HTTPS_HOST=https://example.com
 ```
 
 ## 4. Start docker compose and check status
@@ -68,16 +71,22 @@ sudo docker compose -f docker-compose.production.yml up -d
 sudo docker compose -f docker-compose.production.yml ps
 ```
 
-## 5. Make migrations and create superuser
+## 5. Make migrations
 
 ```bash
 sudo docker compose -f docker-compose.production.yml exec backend python manage.py migrate
 sudo docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic
 sudo docker compose -f docker-compose.production.yml exec backend cp -r /app/collected_static/. /backend_static/static/
-sudo docker compose -f docker-compose.production.yml exec backend python manage.py createsuperuser --email admin@example.com --username admin
 ```
 
-## 6. Additional commands
+## 6. 
+
+```bash
+sudo docker compose -f docker-compose.production.yml exec backend python manage.py add_public_key <your_public_key>
+sudo docker compose -f docker-compose.production.yml exec backend python manage.py delete_public_key <your_public_key>
+```
+
+## 7. Additional commands
 
 ```bash
 sudo docker compose -f docker-compose.production.yml pull

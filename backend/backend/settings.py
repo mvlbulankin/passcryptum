@@ -15,9 +15,9 @@ load_dotenv()
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'default')
 
-HTTP_HOST = os.getenv('HTTP_HOST', '')
+# HTTP_HOST = os.getenv('HTTP_HOST', '')
 
-HTTPS_HOST = os.getenv('HTTPS_HOST', '')
+# HTTPS_HOST = os.getenv('HTTPS_HOST', '')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -26,19 +26,21 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    HTTP_HOST,
-    HTTPS_HOST,
-]
+# CSRF_TRUSTED_ORIGINS = [
+#     HTTP_HOST,
+#     HTTPS_HOST,
+# ]
 
-CORS_ALLOWED_ORIGINS = [
-    HTTP_HOST,
-    HTTPS_HOST,
-]
+# CORS_ALLOWED_ORIGINS = [
+#     HTTP_HOST,
+#     HTTPS_HOST,
+# ]
 
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r'^http://localhost:\d+$',
-]
+# CORS_ALLOWED_ORIGIN_REGEXES = [
+#     r'^http://localhost:\d+$',
+# ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'Public-Key',
@@ -55,7 +57,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'drf_spectacular',
+    # 'drf_spectacular',
     'rest_framework',
     'corsheaders',
     'api',
@@ -64,12 +66,12 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    "corsheaders.middleware.CorsMiddleware",
 ]
 
 ROOT_URLCONF = 'backend.urls'
@@ -96,12 +98,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 DATABASES = {
     'default': {
@@ -161,15 +163,15 @@ STATIC_ROOT = BASE_DIR / 'collected_static'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Настройки для Django REST Framework
-REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',  # Схема для автоматической генерации API-документации
-}
+# # Настройки для Django REST Framework
+# REST_FRAMEWORK = {
+#     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',  # Схема для автоматической генерации API-документации
+# }
 
-# Настройки для drf-spectacular
-SPECTACULAR_SETTINGS = {
-    'TITLE': 'User Management API',                                 # Название API
-    'DESCRIPTION': 'API for storing and retrieving user services',  # Описание API
-    'VERSION': '1.0.0',                                             # Версия API
-    'SERVE_INCLUDE_SCHEMA': False,                                  # Отключение схемы в ответах API
-}
+# # Настройки для drf-spectacular
+# SPECTACULAR_SETTINGS = {
+#     'TITLE': 'User Management API',                                 # Название API
+#     'DESCRIPTION': 'API for storing and retrieving user services',  # Описание API
+#     'VERSION': '1.0.0',                                             # Версия API
+#     'SERVE_INCLUDE_SCHEMA': False,                                  # Отключение схемы в ответах API
+# }
