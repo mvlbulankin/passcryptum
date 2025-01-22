@@ -7,19 +7,26 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='UserServices',
+            name="UserServices",
             fields=[
-                ('public_key', models.CharField(max_length=256, primary_key=True, serialize=False, unique=True)),
-                ('encrypted_services', models.BinaryField(blank=True, editable=True, null=True)),
+                (
+                    "public_key",
+                    models.CharField(
+                        max_length=256, primary_key=True, serialize=False, unique=True
+                    ),
+                ),
+                (
+                    "encrypted_services",
+                    models.BinaryField(blank=True, editable=True, null=True),
+                ),
             ],
             options={
-                'verbose_name': 'User Services',
-                'verbose_name_plural': 'User Services',
+                "verbose_name": "User Services",
+                "verbose_name_plural": "User Services",
             },
         ),
     ]

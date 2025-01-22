@@ -3,6 +3,5 @@ from django.contrib.auth.models import Group
 
 from .models import UserServices
 
-
 admin.site.unregister(Group)
 admin.site.register(UserServices)

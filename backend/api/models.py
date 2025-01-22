@@ -14,10 +14,8 @@ class UserServices(models.Model):
     )
 
     class Meta:
-        verbose_name = 'User Services'
-        verbose_name_plural = 'User Services'
-
+        verbose_name = "User Services"
+        verbose_name_plural = "User Services"
 
     def __str__(self):
         return self.public_key
-    
