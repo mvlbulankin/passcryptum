@@ -79,7 +79,7 @@ sudo docker compose -f docker-compose.production.yml exec backend python manage.
 sudo docker compose -f docker-compose.production.yml exec backend cp -r /app/collected_static/. /backend_static/static/
 ```
 
-## 6. 
+## 6. Add or delete public key
 
 ```bash
 sudo docker compose -f docker-compose.production.yml exec backend python manage.py add_public_key <your_public_key>
