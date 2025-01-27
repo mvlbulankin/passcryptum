@@ -4,7 +4,6 @@ from pathlib import Path
 from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv()
@@ -15,25 +14,19 @@ load_dotenv()
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY", "default")
 
-# HTTP_HOST = os.getenv('HTTP_HOST', '')
-
-# HTTPS_HOST = os.getenv('HTTPS_HOST', '')
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    "127.0.0.1",
+    "*",
 ]
 
 # CSRF_TRUSTED_ORIGINS = [
-#     HTTP_HOST,
-#     HTTPS_HOST,
+#     "https://passcryptum.ddns.net",
 # ]
 
 # CORS_ALLOWED_ORIGINS = [
-#     HTTP_HOST,
-#     HTTPS_HOST,
+#     "https://passcryptum.ddns.net",
 # ]
 
 # CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -57,10 +50,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # 'drf_spectacular',
     "rest_framework",
     "corsheaders",
     "api",
+    "profiles",
 ]
 
 MIDDLEWARE = [
@@ -150,28 +143,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-# Указываем корневую директорию для сборки статических файлов;
-# в контейнере это будет /app/collected_static
 STATIC_URL = "/static/"
 
-# Теперь при вызове команды python manage.py collectstatic
-# Django будет копировать все статические файлы в директорию collected_static
 STATIC_ROOT = BASE_DIR / "collected_static"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# # Настройки для Django REST Framework
-# REST_FRAMEWORK = {
-#     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',  # Схема для автоматической генерации API-документации
-# }
-
-# # Настройки для drf-spectacular
-# SPECTACULAR_SETTINGS = {
-#     'TITLE': 'User Management API',                                 # Название API
-#     'DESCRIPTION': 'API for storing and retrieving user services',  # Описание API
-#     'VERSION': '1.0.0',                                             # Версия API
-#     'SERVE_INCLUDE_SCHEMA': False,                                  # Отключение схемы в ответах API
-# }

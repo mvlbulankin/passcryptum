@@ -1,45 +1,32 @@
-# Перечень volume
 volumes:
   pg_data:
-  # volume — для статических файлов
   static:
 
-# Перечень контейнеров
 services:
-  # Это контейнер БД
+
   db:
-    # Из какого образа запустить контейнер:
     image: postgres:17.2
-    # Файл (или список файлов) с переменными окружения
     env_file: .env
-    # Какой volume подключить для этого контейнера
     volumes:
       - pg_data:/var/lib/postgresql/data
-  # Имя и описание контейнера с бэкендом
+
   backend:
-    # Из какого Dockerfile собирать образ для этого контейнера:
     build: ./backend/
     env_file: .env
-    # Тут подключаем volume к backend
     volumes:
       - static:/backend_static
-    # Какие контейнеры нужно запустить до старта этого контейнера:
-    depends_on:
-      - db
-  # Это контейнер с фронтендом
+
   # frontend:
   #   env_file: .env
   #   build: ./frontend/
-# Добавляем новый контейнер: gateway.
+  #   command: cp -r /app/dist/. /frontend_static/
+  #   volumes:
+  #     - static:/frontend_static
+
   gateway:
-    # Сбилдить и запустить образ, 
-    # описанный в Dockerfile в папке gateway
     build: ./gateway/
-    # А тут подключаем volume со статикой к gateway
+    env_file: .env
     volumes:
-      - static:/staticfiles/
-    # Ключ ports устанавливает
-    # перенаправление всех запросов с порта 8000 хоста
-    # на порт 80 контейнера.
+      - static:/staticfiles
     ports:
-      - 8000:80 
+      - 8000:80

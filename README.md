@@ -98,10 +98,21 @@ sudo docker compose -f docker-compose.production.yml logs
 
 ```bash
 docker buildx build --platform=linux/amd64 -t mvlbulankin/passcryptum_backend .
+docker buildx build --platform=linux/amd64 -t mvlbulankin/passcryptum_frontend .
 docker buildx build --platform=linux/amd64 -t mvlbulankin/passcryptum_gateway .
 ```
 
 ```bash
 docker push mvlbulankin/passcryptum_backend
+docker push mvlbulankin/passcryptum_frontend
 docker push mvlbulankin/passcryptum_gateway
+```
+
+```text
+FROM node:18
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . ./
+RUN npm run build
 ```

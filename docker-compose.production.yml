@@ -3,16 +3,26 @@ volumes:
   static_volume:
 
 services:
+
   db:
     image: postgres:17.2
     env_file: .env
     volumes:
       - pg_data_production:/var/lib/postgresql/data
+
   backend:
     image: mvlbulankin/passcryptum_backend
     env_file: .env
     volumes:
       - static_volume:/backend_static
+
+  # frontend:
+  #   image: mvlbulankin/passcryptum_frontend
+  #   env_file: .env
+  #   command: cp -r /app/dist/. /frontend_static/
+  #   volumes:
+  #     - static_volume:/frontend_static
+
   gateway:
     image: mvlbulankin/passcryptum_gateway
     env_file: .env

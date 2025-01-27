@@ -1,25 +1,27 @@
-from api.models import UserServices
 from django.core.management.base import BaseCommand
+
+from profiles.models import Profile
 
 
 class Command(BaseCommand):
-    help = "Delete public_key"
+    help = "Add public_key"
 
     def add_arguments(self, parser):
         parser.add_argument("public_key", type=str, help="Public key")
 
     def handle(self, *args, **kwargs):
         public_key = kwargs["public_key"]
+        profile, created = Profile.objects.get_or_create(
+            public_key=public_key
+        )
 
-        try:
-            user_service = UserServices.objects.get(public_key=public_key)
-            user_service.delete()
+        if created:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'Public key "{public_key}" has been deleted successfully'
+                    f'Public key "{public_key}" has been added successfully'
                 )
             )
-        except UserServices.DoesNotExist:
+        else:
             self.stdout.write(
-                self.style.ERROR(f'Public key "{public_key}" does not exist')
+                self.style.WARNING(f'Public key "{public_key}" already exists')
             )
