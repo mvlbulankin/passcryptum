@@ -1,0 +1,44 @@
+{
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest",
+    "type-check": "vue-tsc --noemit",
+    "format": "prettier . --ignore-path .gitignore --check",
+    "format:fix": "prettier . --ignore-path .gitignore --write",
+    "lint": "eslint . --ext .vue,.js,.ts --ignore-path .gitignore && stylelint **/*.scss",
+    "lint:fix": "eslint . --ext .vue,.js,.ts --fix --ignore-path .gitignore && stylelint --fix **/*.scss"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/serviceworker": "^0.0.114",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "@vue/eslint-config-typescript": "^13.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-import-resolver-typescript": "^3.7.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-prettier": "^5.2.3",
+    "prettier": "^3.4.2",
+    "sass": "^1.83.4",
+    "stylelint": "^16.13.2",
+    "stylelint-config-prettier-scss": "^1.0.0",
+    "stylelint-config-standard-scss": "^14.0.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.9",
+    "vite-plugin-singlefile": "^2.1.0",
+    "vitest": "^3.0.2",
+    "vue-tsc": "^2.2.0"
+  },
+  "dependencies": {
+    "@vicons/ionicons5": "^0.13.0",
+    "axios": "^1.7.9",
+    "naive-ui": "^2.41.0",
+    "tweetnacl": "^1.0.3",
+    "vue": "^3.5.13"
+  }
+}

@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - story-*
+      - main
+      - dev
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🛎
+        uses: actions/checkout@v4
+
+      - name: Install 👨🏻‍💻
+        run: npm i
+
+      - name: Lint 👀
+        run: npm run lint
+
+      - name: Prettier 🪞
+        run: npm run format
+
+  type_check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🛎
+        uses: actions/checkout@v4
+
+      - name: Install 👨🏻‍💻
+        run: npm i
+
+      - name: Type check 🔤
+        run: npm run type-check
+
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout 🛎
+        uses: actions/checkout@v4
+
+      - name: Install 👨🏻‍💻
+        run: npm i
+
+      - name: Test 🧪
+        run: npm run test
+
+  build-and-hash:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🛎
+        uses: actions/checkout@v4
+
+      - name: Set up NodeJS 🚉
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install 👨🏻‍💻
+        run: npm i
+
+      - name: Build 🏗️
+        run: npm run build
+
+      - name: Copy HTML file to root ©️
+        run: cp dist/index.html passcryptum.html
+
+      - name: Calculate hash 🧮
+        run: sha256sum passcryptum.html > sha256sum.txt
+
+      - name: Publish artifacts 📢
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            passcryptum.html
+            sha256sum.txt

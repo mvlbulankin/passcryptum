@@ -16,29 +16,32 @@ sudo vim /etc/nginx/sites-enabled/default
 
 ```bash
 sudo vim /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl reload nginx
+sudo tail -f /var/log/nginx/error.log
 ```
 
 ```text
 server {
-    
-  listen 443 ssl;
-  server_name 193.233.20.79 passcryptum.ddns.net;
-  
-  ssl_certificate /etc/letsencrypt/live/passcryptum.ddns.net/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/passcryptum.ddns.net/privkey.pem;
-  include /etc/letsencrypt/options-ssl-nginx.conf;
-  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-  
-  location /api/userservices/ {
-      proxy_pass http://127.0.0.1:8000;
-  }
+    listen 80;
+    server_name 193.233.20.79 passcryptum.ddns.net;
 
+    return 301 https://$host$request_uri;
 }
-```
 
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
+server {
+    listen 443 ssl;
+    server_name 193.233.20.79 passcryptum.ddns.net;
+
+    ssl_certificate /etc/letsencrypt/live/passcryptum.ddns.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/passcryptum.ddns.net/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+    }
+}
 ```
 
 ## 2.Install docker-compose
@@ -106,13 +109,4 @@ docker buildx build --platform=linux/amd64 -t mvlbulankin/passcryptum_gateway .
 docker push mvlbulankin/passcryptum_backend
 docker push mvlbulankin/passcryptum_frontend
 docker push mvlbulankin/passcryptum_gateway
-```
-
-```text
-FROM node:18
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . ./
-RUN npm run build
 ```
