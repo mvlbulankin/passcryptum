@@ -64,7 +64,7 @@ DB_PORT=5432
 POSTGRES_DB=django
 POSTGRES_USER=django
 POSTGRES_PASSWORD=pass_example
-SECRET_KEY=key_example
+DJANGO_SECRET_KEY=key_example
 ```
 
 ## 4. Start docker compose and check status
@@ -109,4 +109,10 @@ docker buildx build --platform=linux/amd64 -t mvlbulankin/passcryptum_gateway .
 docker push mvlbulankin/passcryptum_backend
 docker push mvlbulankin/passcryptum_frontend
 docker push mvlbulankin/passcryptum_gateway
+```
+
+```bash
+docker images
+docker rmi $(docker images -f "dangling=true" -q)
+docker logs root-backend-1
 ```

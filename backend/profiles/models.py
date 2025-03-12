@@ -12,5 +12,6 @@ class Profile(models.Model):
         blank=True,
     )
 
-    def __str__(self):
-        return self.public_key
+    class Meta:
+        verbose_name = 'Profile'
+        verbose_name_plural = 'Profiles'

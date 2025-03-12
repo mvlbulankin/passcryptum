@@ -12,31 +12,26 @@ load_dotenv()
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("SECRET_KEY", "default")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    "*",
+    "localhost",
+    "127.0.0.1",
 ]
 
-# CSRF_TRUSTED_ORIGINS = [
-#     "https://passcryptum.ddns.net",
-# ]
+CORS_ALLOW_ALL_ORIGINS = True
 
 # CORS_ALLOWED_ORIGINS = [
 #     "https://passcryptum.ddns.net",
 # ]
 
-# CORS_ALLOWED_ORIGIN_REGEXES = [
-#     r'^http://localhost:\d+$',
-# ]
-
-CORS_ALLOW_ALL_ORIGINS = True
-
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "Public-Key",
+    "Hashed-Pin",
+    "Protector",
     "Timestamp",
     "Signature",
 ]
@@ -54,6 +49,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "api",
     "profiles",
+    "credentials",
 ]
 
 MIDDLEWARE = [
@@ -87,16 +83,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "backend.wsgi.application"
 
-
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
 
 DATABASES = {
     "default": {
@@ -139,7 +134,6 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
@@ -151,3 +145,9 @@ STATIC_ROOT = BASE_DIR / "collected_static"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',  # Оставляем только JSON-рендерер
+    ],
+}
