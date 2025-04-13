@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { NH4, NSpace, NDrawer, NDivider, NDrawerContent } from 'naive-ui'
 
+import { isOnlineMode } from '@/features/online-mode'
+
 import { showStorageDrawer } from '../model'
 import FileImport from './FileImport.vue'
 import CopyServices from './CopyServices.vue'
@@ -23,17 +25,17 @@ import DownloadServicesFromServer from './DownloadServicesFromServer.vue'
       <NDivider />
       <ImportFromText />
       <NDivider />
-      <NH4>API actions</NH4>
-
-      <NSpace vertical size="large">
-        <DeleteServicesFromServer />
-        <DownloadServicesFromServer />
-        <UploadServicesToServer />
-        <CopyPublicKey />
-      </NSpace>
-      <NDivider />
+      <template v-if="isOnlineMode">
+        <NH4>API actions</NH4>
+        <NSpace vertical size="large">
+          <DeleteServicesFromServer />
+          <DownloadServicesFromServer />
+          <UploadServicesToServer />
+          <CopyPublicKey />
+        </NSpace>
+        <NDivider />
+      </template>
       <NH4>Export services</NH4>
-
       <NSpace vertical size="large">
         <DownloadFile />
         <CopyServices />

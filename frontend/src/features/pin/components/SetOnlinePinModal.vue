@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDialog } from 'naive-ui'
 import {
   NIcon,
   NModal,
@@ -17,6 +18,7 @@ import { setOnlinePinState, isCalculationInProgress } from '@/entities/session'
 import { showSetOnlinePinModal } from '../model'
 
 const pin = ref('')
+const dialog = useDialog()
 const message = useMessage()
 const loadingBar = useLoadingBar()
 
@@ -26,22 +28,32 @@ const clearForm = () => {
 
 const onSubmit = () => {
   loadingBar.start()
+  setOnlinePin(pin.value, dialog)
+    .then(result => {
+      if (result.success) {
+        setOnlinePinState(true)
+        message.success('Online PIN has been set')
+        loadingBar.finish()
+        isCalculationInProgress.value = false
+        showSetOnlinePinModal.value = false
+        clearForm()
+      } else if (result.reason === '403') {
+        loadingBar.finish()
+        isCalculationInProgress.value = false
+        showSetOnlinePinModal.value = false
+        clearForm()
+      }
+    })
+    .catch(e => {
+      void e
 
-  setOnlinePin(pin.value).then(() => {
-    setOnlinePinState(true)
-    message.success('Online PIN has been set')
-    loadingBar.finish()
-
-    isCalculationInProgress.value = false
-    showSetOnlinePinModal.value = false
-  })
-
-  clearForm()
-
-  isCalculationInProgress.value = true
+      loadingBar.error()
+      message.error('Failed to set online PIN')
+      isCalculationInProgress.value = false
+    })
 }
 </script>
-§
+
 <template>
   <NModal
     v-model:show="showSetOnlinePinModal"

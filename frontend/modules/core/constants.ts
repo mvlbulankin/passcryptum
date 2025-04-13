@@ -4,7 +4,7 @@ export const LS_KEY_PROTECTOR = 'protector'
 
 export const LS_KEY_PUBLIC_KEY = 'public_key'
 
-// export const LS_KEY_RANDOM_STRING = 'random_string'
+export const LS_KEY_RANDOM_STRING = 'random_string'
 
 export const PIN_BUFFER_BYTE_LENGTH = 48
 

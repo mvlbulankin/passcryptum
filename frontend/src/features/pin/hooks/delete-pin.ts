@@ -26,7 +26,7 @@ export const useDeleteOnlinePin = () => {
         positiveText: 'Yes, delete online PIN',
         negativeText: 'Cancel',
         onPositiveClick() {
-          deleteOnlinePin()
+          deleteOnlinePin(dialog)
           setOnlinePinState(false)
           loadingBar.start()
           message.info('Your online PIN has been deleted')

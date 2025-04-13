@@ -8,9 +8,11 @@ import {
   ColorFillOutline,
   AddCircleOutline,
   LockClosedOutline,
+  CloudDoneOutline,
+  CloudOfflineOutline,
 } from '@vicons/ionicons5'
-import { computed, h, Component } from 'vue'
-import { NDropdown, NButton, NIcon } from 'naive-ui'
+import { computed, h, type Component } from 'vue'
+import { NDropdown, NButton, NIcon, NSwitch } from 'naive-ui'
 
 import { useChangeTheme } from '@/features/theme'
 import { StorageDrawer, openStorage } from '@/features/storage'
@@ -24,17 +26,43 @@ import {
 } from '@/features/pin'
 import { addService, AddServiceModal } from '@/features/add-service'
 import { useExit, isCalculationInProgress } from '@/entities/session'
+import { useChangeOnlineMode, isOnlineMode } from '@/features/online-mode'
 
 const { exit } = useExit()
 const props = defineProps<{ isEntered: boolean }>()
 const { themeName, changeTheme } = useChangeTheme()
+const { toggleOnlineMode } = useChangeOnlineMode()
 const { deleteOnlinePin, isDeleteOnlinePinDisabled } = useDeleteOnlinePin()
 const { deleteOfflinePin, isDeleteOfflinePinDisabled } = useDeleteOfflinePin()
 
 const renderIcon = (icon: Component) => () =>
   h(NIcon, null, { default: () => h(icon) })
 
+const onlineModeIcon = computed(() =>
+  renderIcon(isOnlineMode.value ? CloudDoneOutline : CloudOfflineOutline),
+)
+
 const options = computed(() => [
+  {
+    key: 'onlineMode',
+    label: () =>
+      h(
+        NSwitch,
+        {
+          'value': isOnlineMode.value,
+          'onUpdate:value': toggleOnlineMode,
+          'disabled': isCalculationInProgress.value,
+          'railStyle': ({ checked }: { checked: boolean }) => ({
+            background: checked ? '#18a058' : '#d03050',
+          }),
+        },
+        {
+          checked: () => 'Online',
+          unchecked: () => 'Offline',
+        },
+      ),
+    icon: onlineModeIcon.value,
+  },
   ...(props.isEntered
     ? [
         {
@@ -47,30 +75,40 @@ const options = computed(() => [
           label: 'Add a service',
           icon: renderIcon(AddCircleOutline),
         },
-        {
-          key: 'setOfflinePin',
-          label: 'Set offline PIN',
-          icon: renderIcon(LockClosedOutline),
-        },
-        {
-          key: 'setOnlinePin',
-          label: 'Set online PIN',
-          icon: renderIcon(LockClosedOutline),
-        },
+        ...(isOnlineMode.value
+          ? [
+              {
+                key: 'setOnlinePin',
+                label: 'Set online PIN',
+                icon: renderIcon(LockClosedOutline),
+              },
+            ]
+          : [
+              {
+                key: 'setOfflinePin',
+                label: 'Set offline PIN',
+                icon: renderIcon(LockClosedOutline),
+              },
+            ]),
       ]
     : []),
-  {
-    key: 'deleteOfflinePin',
-    label: 'Delete offline PIN',
-    disabled: isDeleteOfflinePinDisabled.value,
-    icon: renderIcon(LockOpenOutline),
-  },
-  {
-    key: 'deleteOnlinePin',
-    label: 'Delete online PIN',
-    disabled: isDeleteOnlinePinDisabled.value,
-    icon: renderIcon(LockOpenOutline),
-  },
+  ...(isOnlineMode.value
+    ? [
+        {
+          key: 'deleteOnlinePin',
+          label: 'Delete online PIN',
+          disabled: isDeleteOnlinePinDisabled.value,
+          icon: renderIcon(LockOpenOutline),
+        },
+      ]
+    : [
+        {
+          key: 'deleteOfflinePin',
+          label: 'Delete offline PIN',
+          disabled: isDeleteOfflinePinDisabled.value,
+          icon: renderIcon(LockOpenOutline),
+        },
+      ]),
   {
     key: 'changeTheme',
     label: () => themeName.value,
@@ -105,35 +143,27 @@ const handleSelect = (key: string) => {
   switch (key) {
     case 'changeTheme':
       changeTheme()
-
       break
     case 'deleteOfflinePin':
       deleteOfflinePin()
-
       break
     case 'deleteOnlinePin':
       deleteOnlinePin()
-
       break
     case 'signOut':
       exit()
-
       break
     case 'setOfflinePin':
       setOfflinePin()
-
       break
     case 'setOnlinePin':
       setOnlinePin()
-
       break
     case 'addService':
       addService()
-
       break
     case 'storage':
       openStorage()
-
       break
   }
 }
@@ -153,8 +183,8 @@ const handleSelect = (key: string) => {
     </NButton>
   </NDropdown>
 
-  <setOfflinePinModal />
-  <setOnlinePinModal />
+  <SetOfflinePinModal />
+  <SetOnlinePinModal />
   <StorageDrawer />
   <AddServiceModal />
 </template>

@@ -1,5 +1,7 @@
 import { base64ToBuffer, bufferToBase64 } from '#/core'
 
+import { isOnlineMode } from '@/features/online-mode'
+
 import { decrypt, pbkdf2, createAesKey, getBufferOfText } from '../../shared'
 import {
   ORIGIN_BUFFER_ITERATIONS,
@@ -74,21 +76,33 @@ export const enterWithOriginPassword = async (
   )
 
 export const enterWithPin = async (pin: string): Promise<StarterKit> => {
-  let hash = getEncryptedHash()
+  let hash: string
 
-  if (!hash) {
+  if (isOnlineMode.value) {
     const onlineHash = await getEncryptedOnlineHash(pin)
 
     if (!onlineHash) {
-      throw new Error('No encrypted hash available locally or online')
+      throw new Error('No encrypted hash available online')
     }
 
     hash = bufferToBase64(onlineHash)
+  } else {
+    const offlineHash = getEncryptedHash()
+
+    if (!offlineHash) {
+      throw new Error('No encrypted hash available locally')
+    }
+
+    hash =
+      typeof offlineHash === 'string'
+        ? offlineHash
+        : bufferToBase64(offlineHash)
   }
 
   const { iv, key } = await createPinAesData(pin)
+  const decryptedData = await decrypt(iv, key, base64ToBuffer(hash))
 
-  return startSession(await decrypt(iv, key, base64ToBuffer(hash)))
+  return startSession(decryptedData)
 }
 
 export const exit = () => {
