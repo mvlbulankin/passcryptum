@@ -5,7 +5,7 @@ volumes:
 services:
 
   db:
-    image: postgres:17.2
+    image: postgres:17.2-alpine
     env_file: .env
     volumes:
       - pg_data_production:/var/lib/postgresql/data
@@ -26,17 +26,17 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # frontend:
-  #   image: mvlbulankin/passcryptum_frontend
-  #   env_file: .env
-  #   command: cp -r /app/dist/. /frontend_static/
-  #   volumes:
-  #     - static_volume:/frontend_static
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "3"
+  frontend:
+    image: mvlbulankin/passcryptum_frontend
+    env_file: .env
+    command: cp -r /app/dist/. /frontend_static/
+    volumes:
+      - static_volume:/frontend_static
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   gateway:
     image: mvlbulankin/passcryptum_gateway
