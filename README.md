@@ -27,7 +27,33 @@ sudo apt install vim
 Т.к. доступ у root по ssh к серверу мы закроем, то надо создать нового пользователя, через которого и будем дальше подключаться. Создаём пользователя следующей командой:
 
 ```bash
-sudo adduser user_name
+useradd -m user_name -G sudo -s /bin/bash
+```
+
+Правим sudo конфиг:
+
+```bash
+visudo
+```
+
+Даем возможность пользователям группы sudo использовать sudo без ввода пароля, добавляя NOPASSWD, так как мы не будем устанавливать пароли:
+
+```bash
+# Allow members of group sudo to execute any command
+%sudo   ALL=(ALL:ALL) NOPASSWD:ALL
+```
+
+Запрещаем использовать дополнительные конфиги для безопасности, поэтому удаляем эту строчку:
+
+```bash
+#includedir /etc/sudoers.d
+```
+
+Запрещаем группе admin использовать sudo, комментируя эту строчку:
+
+```bash
+# Members of the admin group may gain root privileges
+#%admin ALL=(ALL) ALL
 ```
 
 Перейти от обычного пользователя к root можно командой:
@@ -218,9 +244,11 @@ sudo apt install nginx -y
 sudo systemctl start nginx
 ```
 
-Откроем в браузере IP-адрес своего сервера без указания порта, nginx должен запуститься на 80 порту. 
+Открываем в браузере IP-адрес своего сервера без указания порта, nginx должен запуститься на 80 порту. 
 
-Установка certbot:
+Получаем доменное имя, например через https://www.noip.com
+
+Устанавливаем certbot:
 
 ```bash
 sudo apt install snapd
@@ -229,7 +257,7 @@ sudo snap install --classic certbot
 sudo ln -s /snap/bin/certbot /usr/bin/certbot
 ```
 
-Получение сертификата:
+Получаем сертификат:
 
 ```bash
 sudo certbot --nginx
