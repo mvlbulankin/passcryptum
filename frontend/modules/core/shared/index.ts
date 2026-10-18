@@ -1,13 +1,26 @@
-export * from './lib/text'
+// Crypto and encoding primitives. Internal to core: the app does not import
+// from here (the core barrel re-exports what it needs). Wire framing helpers
+// live in wire/lib/protocol.ts, not here.
 
-export * from './lib/buffer'
+export { getBufferOfText, getTextFromBuffer, parseHexToBuffer } from './lib/text'
 
-export * from './lib/crypto'
+export { concatBuffers, stringifyBuffer } from './lib/buffer'
 
-export * from './lib/charset'
+export { pbkdf2, createAesKey, decrypt, encrypt } from './lib/crypto'
 
-export * from './lib/crypto-utils'
+export { capitals, getCharset } from './lib/charset'
 
-export * from './lib/format-password'
+export {
+  decryptData,
+  encryptData,
+  getHashOfString,
+  getKeyPairFromSeed,
+  base64ToBuffer,
+  base64ToUint8Array,
+  bufferToBase64,
+  uint8ArrayToBase64,
+} from './lib/crypto-utils'
 
-export * from './lib/generate-random-string'
+export { formatPassword } from './lib/format-password'
+
+export { generateRandomString } from './lib/generate-random-string'

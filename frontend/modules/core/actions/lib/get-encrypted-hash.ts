@@ -1,5 +1,4 @@
-import { base64ToUint8Array } from '#/core'
-
+import { base64ToUint8Array } from '../../shared'
 import { wire } from '../../wire'
 import type { SessionStorage } from '../../session/lib/types'
 import { computeWireHashedPin } from './compute-wire-hashed-pin'

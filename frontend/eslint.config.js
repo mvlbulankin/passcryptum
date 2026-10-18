@@ -58,6 +58,30 @@ export default defineConfigWithVueTs(
   },
 
   {
+    // The core barrel is the seam: src/ must not reach past it. The rule
+    // mirrors modules/core/test/barrel.spec.ts, which enforces the same
+    // property and additionally checks that every imported name is exported.
+    name: 'app/core-seam',
+    files: ['src/**/*.{ts,vue}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // Deep imports past the barrel: '#/core/<something>' (the
+              // bare '#/core' stays allowed) and any path into core's lib/.
+              regex: '^(#\\/core\\/.+|.*modules\\/core\\/.*\\/lib\\/.*)$',
+              message:
+                'Import from "#/core" instead: the core barrel is the seam.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
     name: 'app/globals',
     languageOptions: {
       globals: {
