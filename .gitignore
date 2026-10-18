@@ -166,6 +166,5 @@ passcryptum.db
 .agents/
 .pi/
 
-# scratch working notes, except the upstream issue copies
-.scratch/*
-!.scratch/upstream/
+# local scratch notes (not documentation)
+.scratch/

@@ -31,7 +31,7 @@ to log in and generate passwords, an attacker needs to obtain:
 - The encrypted text saved on your device;
 - The random string stored next to it;
 - Your PIN (it stretches through PBKDF2, so it must be strong — see
-  `docs/recommendations.md`).
+  [recommendations](recommendations.md)).
 
 In general, only you and nobody but you can possess these resources.
 

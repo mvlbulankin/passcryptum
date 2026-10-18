@@ -15,7 +15,7 @@ throughout.
 > (MIT, last release v2.1.4 — development stopped there). The server
 > synchronization follows the design sketched in its
 > [issue #187](https://github.com/nelkor/passcryptum/issues/187); a local
-> copy of the design notes lives in `.scratch/upstream/`.
+> copy of the design notes lives in [docs/upstream](docs/upstream/).
 
 ## Getting started
 
@@ -28,12 +28,12 @@ throughout.
 Well done — you have transferred an account to Passcryptum.
 
 Set a PIN to avoid re-entering the origin password constantly: read
-[docs/pin.md](docs/pin.md) for why it matters and how to use it. The online
-PIN additionally lets new devices pull your encrypted vault from your
-server. Learn [our recommendations](docs/recommendations.md) on recovery
-strategies and the [password generation algorithm](docs/password-generation.md).
+[PIN usage](docs/pin.md) for why it matters and how to use it. The online PIN
+additionally lets new devices pull your encrypted vault from your server.
+Learn our [recommendations](docs/recommendations.md) on recovery strategies
+and the [password generation algorithm](docs/password-generation.md).
 
-## Architecture (ADR-0001)
+## Architecture
 
 ```
 browser ── Caddy (:443, automatic TLS, security headers, body cap)
@@ -42,11 +42,17 @@ browser ── Caddy (:443, automatic TLS, security headers, body cap)
 
 Two containers, one binary. The wire protocol between the SPA and the
 backend is a versioned public contract pinned by contract tests
-(`backend/contract/`, ADR-0002/0003). Domain terms live in
-`GLOSSARY.md`; decisions in `docs/adr/`.
+([backend/contract](backend/contract/README.md)).
 
 **Versioning note:** protocol versions (`Protocol-Version: v1/v2`) are
 independent of product versions (2.x → 3.x).
+
+## Documentation
+
+- [docs/](docs/README.md) — user guides, architecture decisions (`docs/adr/`), upstream notes.
+- [GLOSSARY.md](GLOSSARY.md) — canonical domain terms.
+- [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md) —
+  per-component developer docs.
 
 ## Deploy
 
@@ -76,11 +82,6 @@ design.
 | `PC_RATE_PER_MIN` | `300` | per-IP requests per minute |
 | `PC_PROFILE_FAIL_MAX` | `100` | failed credential auths per profile / 10 min (lockout) |
 | `VITE_API_BASE_URL` | same origin | frontend build-time API base |
-
-## Development
-
-- [frontend/README.md](frontend/README.md) — Vue 3 + TS SPA: scripts, tests, structure.
-- [backend/README.md](backend/README.md) — Go service: build, CLI, unit and contract tests.
 
 ## License
 

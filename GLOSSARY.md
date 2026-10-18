@@ -57,7 +57,7 @@ The frontend↔server protocol: base64 headers (`Public-Key`, `Hashed-Pin`,
 (`/api/profiles/`, `/api/credentials/`). GET/DELETE on credentials carry no
 signature at all (factors instead of a signature).
 
-Two versions (ADR-0003): **v1** — symmetric ±300 s window, signatures over
+Two versions ([ADR-0003](docs/adr/0003-protocol-v2.md)): **v1** — symmetric ±300 s window, signatures over
 `timestamp` (headers) / `ts ‖ payload` (bodies), replay protection on POST
 only. **v2** — requested via the `Protocol-Version: 2` header: signatures
 include the HTTP method (`method ‖ ts` / `method ‖ ts ‖ payload`), the

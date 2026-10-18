@@ -6,9 +6,9 @@ Status: accepted
 ## Context
 
 The frontend and the backend talk over a custom cryptographic protocol
-designed in `.scratch/upstream/187.md`: base64 headers (`Public-Key`,
-`Hashed-Pin`, `Protector`, `Timestamp`, `Signature`), POST bodies of
-`base64(signature(64B) ‖ timestamp(4B LE) ‖ payload)`, four endpoints
+designed in the [upstream notes](../upstream/README.md): base64 headers
+(`Public-Key`, `Hashed-Pin`, `Protector`, `Timestamp`, `Signature`), POST
+bodies of `base64(signature(64B) ‖ timestamp(4B LE) ‖ payload)`, four endpoints
 (`/api/profiles/`, `/api/credentials/`). GET/DELETE on credentials carry no
 signature: they authenticate by factors (public key + PIN hash + protector),
 not by signature — a quirk inherited from the original design.
