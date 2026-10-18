@@ -1,7 +1,7 @@
-// Package contract holds the wire-protocol contract tests (ADR-0001).
+// Package contract holds the wire-protocol contract tests (ADR-0002).
 //
 // These tests pin the v1 protocol behaviour of ANY Passcryptum backend.
-// Changing them == changing the protocol (a new version, ADR-0001).
+// Changing them == changing the protocol (a new version, ADR-0003).
 //
 // Protocol summary:
 //   - Headers (base64): Public-Key(32B), Hashed-Pin, Protector, Timestamp(4B LE), Signature(64B)

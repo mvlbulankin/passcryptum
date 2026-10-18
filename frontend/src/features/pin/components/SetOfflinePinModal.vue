@@ -18,7 +18,7 @@ import { session, touchSession, showSetOfflinePinModal  } from '../model'
 const pin = ref('')
 
 // The client enforces a minimum PIN length to bound the dictionary space
-// the KDF has to defend (ADR-0001).
+// the KDF has to defend (ADR-0003).
 const MIN_PIN_LENGTH = 8
 const message = useMessage()
 const loadingBar = useLoadingBar()

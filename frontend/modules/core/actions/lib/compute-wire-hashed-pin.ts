@@ -1,7 +1,7 @@
 import { getHashOfString } from '../../shared'
 import { WIRE_PIN_ITERATIONS } from '../../constants'
 
-// The protocol v2 wire value for the Hashed-Pin header (ADR-0001): the bare
+// The protocol v2 wire value for the Hashed-Pin header (ADR-0003): the bare
 // SHA-512 of the PIN (the v1 value) is stretched with PBKDF2-SHA512 salted
 // by the profile's public key, so a captured or logged header value costs
 // ~600k iterations per dictionary guess instead of one hash. The public key

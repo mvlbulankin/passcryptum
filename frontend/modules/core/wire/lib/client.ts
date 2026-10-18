@@ -13,7 +13,7 @@ import {
 import { profilesUrl, credentialsUrl } from './urls'
 import type { Transport, WireClient, WireRequest } from './types'
 
-// Protocol v2 (ADR-0001): every request declares its version and every
+// Protocol v2 (ADR-0003): every request declares its version and every
 // signature binds the HTTP method — a captured GET can no longer be
 // replayed as a DELETE, and the server's one-sided window applies.
 const protocolVersion = '2'

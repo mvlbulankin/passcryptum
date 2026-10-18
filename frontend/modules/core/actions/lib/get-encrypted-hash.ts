@@ -35,7 +35,7 @@ export const getEncryptedOnlineHash = async (
   }
 
   try {
-    // v2 wire value: PBKDF2-stretched with the public key as salt (ADR-0001)
+    // v2 wire value: PBKDF2-stretched with the public key as salt (ADR-0003)
     const hashedPin = await computeWireHashedPin(
       pin,
       base64ToUint8Array(publicKey),

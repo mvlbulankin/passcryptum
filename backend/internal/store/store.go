@@ -1,5 +1,5 @@
 // Package store is the SQLite persistence for Profile and Credential rows
-// (ADR-0002). All SQL lives here; the server speaks only in domain calls.
+// (ADR-0001). All SQL lives here; the server speaks only in domain calls.
 package store
 
 import (
