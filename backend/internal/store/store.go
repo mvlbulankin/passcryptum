@@ -105,15 +105,47 @@ func (s *Store) DeletePublicKey(pub string) (bool, error) {
 	return rowsAffected(res), nil
 }
 
-// GetServices: found=false means unknown profile; services.Valid means the
-// profile has a services blob.
-func (s *Store) GetServices(pub string) (services sql.NullString, found bool, err error) {
-	err = s.db.QueryRow("SELECT services, 1 FROM profiles WHERE public_key = ?", pub).Scan(&services, &found)
+// GetServices returns the Services blob, nil when the profile has none, and
+// found=false when the profile does not exist. The interface speaks the
+// domain: no database/sql types escape the module.
+func (s *Store) GetServices(pub string) (services *string, found bool, err error) {
+	var stored sql.NullString
+
+	err = s.db.QueryRow(
+		"SELECT services FROM profiles WHERE public_key = ?", pub,
+	).Scan(&stored)
 	if err == sql.ErrNoRows {
-		return services, false, nil
+		return nil, false, nil
 	}
 
-	return services, found, err
+	if err != nil {
+		return nil, false, fmt.Errorf("get services: %w", err)
+	}
+
+	if !stored.Valid {
+		return nil, true, nil
+	}
+
+	return &stored.String, true, nil
+}
+
+// ProfileExists answers the question the contract keeps asking: is this key
+// onboarded? (Previously spelled as a discarded GetServices call.)
+func (s *Store) ProfileExists(pub string) (bool, error) {
+	var one int
+
+	err := s.db.QueryRow(
+		"SELECT 1 FROM profiles WHERE public_key = ?", pub,
+	).Scan(&one)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("profile exists: %w", err)
+	}
+
+	return true, nil
 }
 
 func (s *Store) SetServices(pub, servicesB64 string) (bool, error) {

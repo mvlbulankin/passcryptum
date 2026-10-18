@@ -24,8 +24,9 @@ var (
 		Headers: []string{wire.HdrPublicKey, wire.HdrTimestamp, wire.HdrSignature},
 	}
 	recProfilesPost = wire.Recipe{
-		Headers:    []string{wire.HdrPublicKey},
-		BodySigned: true,
+		Headers:      []string{wire.HdrPublicKey},
+		BodySigned:   true,
+		NeedsProfile: true,
 	}
 	recProfilesDelete = recProfilesGet
 	recCredentialsGet = wire.Recipe{
@@ -33,8 +34,9 @@ var (
 		Headers: []string{wire.HdrPublicKey, wire.HdrHashedPin, wire.HdrProtector, wire.HdrTimestamp},
 	}
 	recCredentialsPost = wire.Recipe{
-		Headers:    []string{wire.HdrPublicKey, wire.HdrHashedPin},
-		BodySigned: true,
+		Headers:      []string{wire.HdrPublicKey, wire.HdrHashedPin},
+		BodySigned:   true,
+		NeedsProfile: true,
 	}
 	recCredentialsDelete = wire.Recipe{
 		Headers: []string{wire.HdrPublicKey, wire.HdrProtector, wire.HdrTimestamp},
@@ -42,12 +44,16 @@ var (
 )
 
 type server struct {
-	st *store.Store
-	g  *guard.Guard
+	st  *store.Store
+	g   *guard.Guard
+	now func() time.Time
+
+	// deny writes 403 and the audit line; every denial goes through it.
+	deny func(w http.ResponseWriter, r *http.Request, pub, why string)
 }
 
 func serve(st *store.Store, g *guard.Guard, addr string) error {
-	s := &server{st: st, g: g}
+	s := &server{st: st, g: g, now: time.Now}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/profiles/", s.handleProfiles)
@@ -109,196 +115,237 @@ func (s *server) handleCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *server) profilesGet(w http.ResponseWriter, r *http.Request) {
-	auth, e := wire.ParseRequest(r, s.g, recProfilesGet)
+// answer is what a domain function produces: a body to send with 200, or a
+// denial carrying the audit reason. Statuses that are not 200 are the
+// pipeline's business, so no handler writes headers itself.
+type answer struct {
+	body      string
+	noContent bool   // 204: the resource exists but holds nothing
+	denied    string // non-empty: 403 with this reason
+}
+
+func ok(body string) answer     { return answer{body: body} }
+func denied(why string) answer  { return answer{denied: why} }
+func okEmpty() answer           { return answer{} }
+func (a answer) isDenied() bool { return a.denied != "" }
+
+// endpoint is a handler with the wire concerns removed.
+type endpoint func(auth *wire.Auth) (answer, *wire.Error)
+
+// handle runs one endpoint: parse and verify the request, enforce the
+// recipe's profile requirement, run the domain function, and write exactly
+// one response. It is the only place that emits 403 or the audit line.
+func (s *server) handle(
+	w http.ResponseWriter,
+	r *http.Request,
+	rec wire.Recipe,
+	fn endpoint,
+) {
+	auth, e := wire.ParseRequestWith(r, s.g, rec, wire.Options{Now: s.now})
 	if e != nil {
-		e.Write(w)
+		s.writeWireError(w, r, e)
+
 		return
 	}
 
-	services, found, err := s.st.GetServices(auth.PublicB64)
-	if err != nil {
-		dbError(w, err)
+	if rec.NeedsProfile {
+		exists, err := s.st.ProfileExists(auth.PublicB64)
+		if err != nil {
+			log.Printf("db error: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+
+			return
+		}
+
+		if !exists {
+			s.writeDenied(w, r, auth.PublicB64, "unknown profile")
+
+			return
+		}
+	}
+
+	result, e := fn(auth)
+	if e != nil {
+		s.writeWireError(w, r, e)
+
 		return
 	}
 
-	if !found {
-		s.logDenied(r, auth, "unknown profile")
-		w.WriteHeader(http.StatusForbidden)
+	if result.isDenied() {
+		s.writeDenied(w, r, auth.PublicB64, result.denied)
+
 		return
 	}
 
-	if !services.Valid {
+	if result.noContent {
 		w.WriteHeader(http.StatusNoContent)
+
 		return
 	}
 
-	wire.WriteJSONString(w, services.String)
+	if result.body == "" {
+		w.WriteHeader(http.StatusOK)
+
+		return
+	}
+
+	wire.WriteJSONString(w, result.body)
+}
+
+func (s *server) profilesGet(w http.ResponseWriter, r *http.Request) {
+	s.handle(w, r, recProfilesGet, func(auth *wire.Auth) (answer, *wire.Error) {
+		services, found, err := s.st.GetServices(auth.PublicB64)
+		if err != nil {
+			s.dbFailure(err)
+
+			return answer{}, errInternal
+		}
+
+		if !found {
+			return denied("unknown profile"), nil
+		}
+
+		if services == nil {
+			return answer{noContent: true}, nil
+		}
+
+		return ok(*services), nil
+	})
 }
 
 func (s *server) profilesPost(w http.ResponseWriter, r *http.Request) {
-	auth, e := wire.ParseRequest(r, s.g, recProfilesPost)
-	if e != nil {
-		s.writeWireError(w, r, e)
-		return
-	}
+	s.handle(w, r, recProfilesPost, func(auth *wire.Auth) (answer, *wire.Error) {
+		if _, err := s.st.SetServices(
+			auth.PublicB64,
+			base64.StdEncoding.EncodeToString(auth.Payload),
+		); err != nil {
+			s.dbFailure(err)
 
-	if !s.profileExists(auth.PublicB64, w) {
-		return
-	}
+			return answer{}, errInternal
+		}
 
-	servicesB64 := base64.StdEncoding.EncodeToString(auth.Payload)
-
-	if _, err := s.st.SetServices(auth.PublicB64, servicesB64); err != nil {
-		dbError(w, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+		return okEmpty(), nil
+	})
 }
 
 func (s *server) profilesDelete(w http.ResponseWriter, r *http.Request) {
-	auth, e := wire.ParseRequest(r, s.g, recProfilesDelete)
-	if e != nil {
-		e.Write(w)
-		return
-	}
+	s.handle(w, r, recProfilesDelete, func(auth *wire.Auth) (answer, *wire.Error) {
+		cleared, found, err := s.st.ClearServices(auth.PublicB64)
+		if err != nil {
+			s.dbFailure(err)
 
-	cleared, found, err := s.st.ClearServices(auth.PublicB64)
-	if err != nil {
-		dbError(w, err)
-		return
-	}
+			return answer{}, errInternal
+		}
 
-	if !found {
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
+		if !found {
+			return denied("unknown profile"), nil
+		}
 
-	if !cleared {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
+		if !cleared {
+			return answer{noContent: true}, nil
+		}
 
-	w.WriteHeader(http.StatusOK)
+		return okEmpty(), nil
+	})
 }
 
 func (s *server) credentialsGet(w http.ResponseWriter, r *http.Request) {
-	auth, e := wire.ParseRequest(r, s.g, recCredentialsGet)
-	if e != nil {
-		e.Write(w)
-		return
-	}
-
-	// Lockout gate: refuse without consulting the db while the profile is
-	// over the failure budget.
-	if s.g.Locked(auth.PublicB64) {
-		s.logDenied(r, auth, "profile locked (auth failures)")
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	// Failure counters only grow for KNOWN profiles: counting unknown keys
-	// too would let anyone grow the failures map (and the log) with fresh
-	// random Public-Keys.
-	if _, found, err := s.st.GetServices(auth.PublicB64); err != nil {
-		dbError(w, err)
-		return
-	} else if !found {
-		s.logDenied(r, auth, "unknown profile")
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	entropy, found, err := s.st.GetCredential(auth.PublicB64, auth.HashedPin, auth.Protector)
-	if err != nil {
-		dbError(w, err)
-		return
-	}
-
-	if !found {
-		s.logDenied(r, auth, "credential auth failed")
-
-		if s.g.NoteFailure(auth.PublicB64) {
-			log.Printf("profile %.8s... locked out (auth failures)", auth.PublicB64)
+	s.handle(w, r, recCredentialsGet, func(auth *wire.Auth) (answer, *wire.Error) {
+		// Lockout gate: refuse without consulting the db while the profile
+		// is over the failure budget.
+		if s.g.Locked(auth.PublicB64) {
+			return denied("profile locked (auth failures)"), nil
 		}
 
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
+		// Failure counters only grow for KNOWN profiles: counting unknown
+		// keys would let anyone inflate the map and the log.
+		exists, err := s.st.ProfileExists(auth.PublicB64)
+		if err != nil {
+			s.dbFailure(err)
 
-	s.g.ClearFailures(auth.PublicB64)
-	wire.WriteJSONString(w, entropy)
+			return answer{}, errInternal
+		}
+
+		if !exists {
+			return denied("unknown profile"), nil
+		}
+
+		entropy, found, err := s.st.GetCredential(
+			auth.PublicB64, auth.HashedPin, auth.Protector,
+		)
+		if err != nil {
+			s.dbFailure(err)
+
+			return answer{}, errInternal
+		}
+
+		if !found {
+			if s.g.NoteFailure(auth.PublicB64) {
+				log.Printf("profile %.8s... locked out (auth failures)", auth.PublicB64)
+			}
+
+			return denied("credential auth failed"), nil
+		}
+
+		s.g.ClearFailures(auth.PublicB64)
+
+		return ok(entropy), nil
+	})
 }
 
 func (s *server) credentialsPost(w http.ResponseWriter, r *http.Request) {
-	auth, e := wire.ParseRequest(r, s.g, recCredentialsPost)
-	if e != nil {
-		s.writeWireError(w, r, e)
-		return
-	}
+	s.handle(w, r, recCredentialsPost, func(auth *wire.Auth) (answer, *wire.Error) {
+		protector := make([]byte, 32)
+		if _, err := rand.Read(protector); err != nil { // must be unpredictable
+			s.dbFailure(err)
 
-	if !s.profileExists(auth.PublicB64, w) {
-		return
-	}
+			return answer{}, errInternal
+		}
 
-	protector := make([]byte, 32)
-	if _, err := rand.Read(protector); err != nil { // must be unpredictable
-		log.Printf("rng error: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+		protectorB64 := base64.StdEncoding.EncodeToString(protector)
 
-	protectorB64 := base64.StdEncoding.EncodeToString(protector)
-	entropyB64 := base64.StdEncoding.EncodeToString(auth.Payload)
+		if err := s.st.CreateCredential(
+			auth.PublicB64,
+			auth.HashedPin,
+			protectorB64,
+			base64.StdEncoding.EncodeToString(auth.Payload),
+		); err != nil {
+			s.dbFailure(err)
 
-	if err := s.st.CreateCredential(auth.PublicB64, auth.HashedPin, protectorB64, entropyB64); err != nil {
-		dbError(w, err)
-		return
-	}
+			return answer{}, errInternal
+		}
 
-	wire.WriteJSONString(w, protectorB64)
+		return ok(protectorB64), nil
+	})
 }
 
 func (s *server) credentialsDelete(w http.ResponseWriter, r *http.Request) {
-	auth, e := wire.ParseRequest(r, s.g, recCredentialsDelete)
-	if e != nil {
-		e.Write(w)
-		return
-	}
+	s.handle(w, r, recCredentialsDelete, func(auth *wire.Auth) (answer, *wire.Error) {
+		deleted, err := s.st.DeleteCredential(auth.PublicB64, auth.Protector)
+		if err != nil {
+			s.dbFailure(err)
 
-	deleted, err := s.st.DeleteCredential(auth.PublicB64, auth.Protector)
-	if err != nil {
-		dbError(w, err)
-		return
-	}
+			return answer{}, errInternal
+		}
 
-	if !deleted {
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
+		if !deleted {
+			return denied("unknown credential"), nil
+		}
 
-	w.WriteHeader(http.StatusOK)
+		return okEmpty(), nil
+	})
 }
 
-// profileExists answers the 403-for-unknown-profile part of the contract.
-func (s *server) profileExists(pubB64 string, w http.ResponseWriter) bool {
-	_, found, err := s.st.GetServices(pubB64)
-	if err != nil {
-		dbError(w, err)
-		return false
-	}
+// errInternal is the only 500 the domain functions produce; the failure
+// itself is logged by dbFailure so the response stays opaque.
+var errInternal = &wire.Error{Status: http.StatusInternalServerError}
 
-	if !found {
-		w.WriteHeader(http.StatusForbidden)
-		return false
-	}
-
-	return true
+func (s *server) dbFailure(err error) {
+	log.Printf("db error: %v", err)
 }
 
-// writeWireError writes the wire failure and logs the denials that carry a
-// reason (the replay 403 lost its audit line when it moved into wire).
+// writeWireError writes a wire-level failure and logs denials that carry a
+// reason (the replay 403 would otherwise lose its audit line).
 func (s *server) writeWireError(w http.ResponseWriter, r *http.Request, e *wire.Error) {
 	if e.Reason != "" {
 		log.Printf(
@@ -310,14 +357,12 @@ func (s *server) writeWireError(w http.ResponseWriter, r *http.Request, e *wire.
 	e.Write(w)
 }
 
-func dbError(w http.ResponseWriter, err error) {
-	log.Printf("db error: %v", err)
-	w.WriteHeader(http.StatusInternalServerError)
-}
-
-func (s *server) logDenied(r *http.Request, auth *wire.Auth, why string) {
+// writeDenied is the single owner of the contract's most repeated status.
+func (s *server) writeDenied(w http.ResponseWriter, r *http.Request, pub, why string) {
 	log.Printf(
 		"denied %s %s ip=%s pub=%.8s... reason=%s",
-		r.Method, r.URL.Path, guard.ClientIP(r), auth.PublicB64, why,
+		r.Method, r.URL.Path, guard.ClientIP(r), pub, why,
 	)
+
+	w.WriteHeader(http.StatusForbidden)
 }

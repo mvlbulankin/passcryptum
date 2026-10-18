@@ -52,8 +52,8 @@ func TestServicesRoundTrip(t *testing.T) {
 	}
 
 	services, found, _ := s.GetServices("pub-A")
-	if !found || services.Valid {
-		t.Fatalf("fresh profile: found=%v valid=%v, want true/false", found, services.Valid)
+	if !found || services != nil {
+		t.Fatalf("fresh profile: found=%v services=%v, want true/nil", found, services)
 	}
 
 	if ok, _ := s.SetServices("pub-A", "YmxvYg=="); !ok {
@@ -65,8 +65,8 @@ func TestServicesRoundTrip(t *testing.T) {
 	}
 
 	services, found, _ = s.GetServices("pub-A")
-	if !found || !services.Valid || services.String != "YmxvYg==" {
-		t.Fatalf("round-trip failed: %+v found=%v", services, found)
+	if !found || services == nil || *services != "YmxvYg==" {
+		t.Fatalf("round-trip failed: %v found=%v", services, found)
 	}
 
 	cleared, found, _ := s.ClearServices("pub-A")

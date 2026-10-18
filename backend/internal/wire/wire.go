@@ -47,15 +47,27 @@ type Recipe struct {
 	// otherwise the Signature header covers the Timestamp bytes (v2: with the
 	// method prefixed).
 	BodySigned bool
+
+	// NeedsProfile makes the endpoint answer 403 for a key that was never
+	// onboarded. It is part of the contract, so it belongs to the recipe
+	// rather than to each handler's memory.
+	NeedsProfile bool
+}
+
+// Options carries what the pipeline needs besides the request itself. The
+// clock is injected so the timestamp window can be tested at its exact
+// boundaries instead of relative to the wall clock.
+type Options struct {
+	Now func() time.Time
 }
 
 // Auth is the verified request identity plus any payload the recipe carried.
+// Only what a handler acts on is exported: the public key stays inside the
+// pipeline, and the nonce never leaves it.
 type Auth struct {
-	PublicKey ed25519.PublicKey
-	PublicB64 string
+	PublicB64 string // base64 as sent: the Profile identifier
 	HashedPin string // b64 text as sent, "" if the recipe does not require it
 	Protector string // b64 text
-	Nonce     []byte // v2 only: random per request, part of the signed message
 	Payload   []byte // set for BodySigned recipes
 }
 
@@ -108,7 +120,31 @@ func WriteJSONString(w http.ResponseWriter, s string) {
 // too. Without the header the frozen v1 behavior applies (ADR-0002), so
 // cached old frontends keep working while their service worker updates.
 func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
-	auth := &Auth{}
+	return ParseRequestWith(r, g, rec, Options{})
+}
+
+// pending is the pipeline's scratch space. The verified public key and the
+// nonce never leave this package: handlers act on the Profile identifier and
+// the payload, nothing else.
+type pending struct {
+	auth      Auth
+	publicKey ed25519.PublicKey
+	nonce     []byte
+}
+
+// ParseRequestWith is ParseRequest with dependencies injected (the clock).
+func ParseRequestWith(
+	r *http.Request,
+	g *guard.Guard,
+	rec Recipe,
+	opts Options,
+) (*Auth, *Error) {
+	now := opts.Now
+	if now == nil {
+		now = time.Now
+	}
+
+	p := &pending{}
 	var timestamp, signature, nonce []byte
 	v2 := r.Header.Get("Protocol-Version") == "2"
 
@@ -129,12 +165,12 @@ func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
 				return nil, errField(name, "Invalid "+name+" format")
 			}
 
-			auth.PublicKey = ed25519.PublicKey(raw)
-			auth.PublicB64 = v
+			p.publicKey = ed25519.PublicKey(raw)
+			p.auth.PublicB64 = v
 		case HdrHashedPin:
-			auth.HashedPin = v
+			p.auth.HashedPin = v
 		case HdrProtector:
-			auth.Protector = v
+			p.auth.Protector = v
 		case HdrTimestamp:
 			timestamp = raw
 		case HdrSignature:
@@ -144,15 +180,13 @@ func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
 		}
 	}
 
-	// v2 requires a nonce on signed requests (header recipes carry the
-	// Signature header; body recipes sign the payload) — unsigned credential
-	// requests keep their factor-auth quirk and no nonce: it is what makes every
-	// request's signature unique, so the replay cache never rejects a
-	// legitimate second request within the same timestamp second. It is
-	// parsed here (not via Recipe.Headers) so recipes stay declarative.
+	// v2 requires a nonce on signed requests: it makes every request's
+	// signature unique, so the replay cache never rejects a legitimate second
+	// request within the same timestamp second. Unsigned credential requests
+	// keep their factor-auth quirk and carry no nonce.
 	if v2 && (signature != nil || rec.BodySigned) {
-		nonce = nil
-
+		// Read it here rather than via Recipe.Headers: the header is required
+		// by the version, not declaratively by the endpoint.
 		if raw := r.Header.Get(HdrNonce); raw != "" {
 			decoded, derr := base64.StdEncoding.DecodeString(raw)
 			if derr != nil {
@@ -170,21 +204,21 @@ func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
 			return nil, errField(HdrNonce, "Invalid "+HdrNonce+" format")
 		}
 
-		auth.Nonce = nonce
+		p.nonce = nonce
 	}
 
 	if rec.BodySigned {
-		return parseSignedBody(r, g, auth, v2)
+		return parseSignedBody(r, g, p, v2, now)
 	}
 
-	if err := checkTimestamp(timestamp, v2); err != nil {
+	if err := checkTimestamp(timestamp, v2, now); err != nil {
 		return nil, err
 	}
 
 	// Recipes without HdrSignature (GET/DELETE /api/credentials/, the v1
-	// unsigned quirk) skip verification; presence of the header is enforced
-	// above when the recipe lists it. v2 binds the method into the signed
-	// message, so a captured GET signature cannot be replayed as a DELETE.
+	// unsigned quirk) skip verification; presence is enforced above when the
+	// recipe lists the header. v2 binds the method into the signed message,
+	// so a captured GET signature cannot be replayed as a DELETE.
 	if signature != nil {
 		msg := timestamp
 
@@ -192,22 +226,28 @@ func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
 			msg = concat(concat([]byte(r.Method), timestamp), nonce)
 		}
 
-		if err := verify(auth.PublicKey, msg, signature); err != nil {
+		if err := verify(p.publicKey, msg, signature); err != nil {
 			return nil, err
 		}
 	}
 
 	// v2: replay rejection covers GET/DELETE too — signatures now differ per
-	// request (fresh timestamp), so a repeat sighting is a replayed capture.
-	// Unsigned recipes have no signature to key on (and none to replay).
-	if v2 && signature != nil && g.RejectReplay(auth.PublicB64, replayBytes(signature, nonce)) {
+	// request (fresh timestamp + nonce), so a repeat sighting is a replay.
+	if v2 && signature != nil &&
+		g.RejectReplay(p.auth.PublicB64, replayBytes(signature, nonce)) {
 		return nil, &Error{Status: http.StatusForbidden, Reason: "replayed request"}
 	}
 
-	return auth, nil
+	return &p.auth, nil
 }
 
-func parseSignedBody(r *http.Request, g *guard.Guard, auth *Auth, v2 bool) (*Auth, *Error) {
+func parseSignedBody(
+	r *http.Request,
+	g *guard.Guard,
+	p *pending,
+	v2 bool,
+	now func() time.Time,
+) (*Auth, *Error) {
 	body, err := readBody(r)
 	if err != nil || len(body) == 0 {
 		return nil, errField("Body", "Body is required")
@@ -224,37 +264,36 @@ func parseSignedBody(r *http.Request, g *guard.Guard, auth *Auth, v2 bool) (*Aut
 
 	sig, tstamp, payload := raw[:64], raw[64:68], raw[68:]
 
-	if err := checkTimestamp(tstamp, v2); err != nil {
+	if err := checkTimestamp(tstamp, v2, now); err != nil {
 		return nil, err
 	}
 
 	msg := concat(tstamp, payload)
 
 	if v2 {
-		msg = concat(concat(concat([]byte(r.Method), tstamp), auth.Nonce), payload)
+		msg = concat(concat(concat([]byte(r.Method), tstamp), p.nonce), payload)
 	}
 
-	if err := verify(auth.PublicKey, msg, sig); err != nil {
+	if err := verify(p.publicKey, msg, sig); err != nil {
 		return nil, err
 	}
 
-	if g.RejectReplay(auth.PublicB64, sig) {
+	if g.RejectReplay(p.auth.PublicB64, sig) {
 		return nil, &Error{Status: http.StatusForbidden, Reason: "replayed POST"}
 	}
 
-	auth.Payload = payload
+	p.auth.Payload = payload
 
-	return auth, nil
+	return &p.auth, nil
 }
 
-func checkTimestamp(raw []byte, oneSided bool) *Error {
+func checkTimestamp(raw []byte, oneSided bool, now func() time.Time) *Error {
 	if len(raw) != 4 {
 		return errField(HdrTimestamp, "Malformed timestamp")
 	}
 
 	t := int64(binary.LittleEndian.Uint32(raw))
-	now := time.Now().Unix()
-	d := now - t
+	d := now().Unix() - t
 
 	// v1: symmetric ±300 s (pre-issued requests accepted — pinned quirk).
 	// v2: one-sided 0 <= now-ts <= 300 — a timestamp from the future is

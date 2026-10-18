@@ -89,8 +89,8 @@ func TestHeaderRecipeVerifiesSignatureOverTimestamp(t *testing.T) {
 		t.Fatalf("valid signed GET must parse: %v", err)
 	}
 
-	if string(auth.PublicKey) != string(pub) || auth.PublicB64 != pubB64 {
-		t.Fatalf("auth must carry the public key, got %q", auth.PublicB64)
+	if auth.PublicB64 != pubB64 {
+		t.Fatalf("auth must carry the profile identifier, got %q", auth.PublicB64)
 	}
 }
 
