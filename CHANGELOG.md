@@ -4,38 +4,6 @@ All notable changes to Passcryptum. This project continues
 [nelkor/passcryptum](https://github.com/nelkor/passcryptum) (v2.1.4 was its
 last release).
 
-## Unreleased
-
-### Fixed
-
-- **Returning devices received app updates only after a long delay.** The
-  service worker serves the single-file app shell cache-first, and the
-  browser's own update check is throttled: a registered worker is re-checked
-  on navigation, but at most once every 24 hours. A device therefore kept
-  serving the build it first cached (measured: zero update-check requests
-  over three launches) until the window expired. A phone frozen on a
-  pre-fix 3.0.0 build failed every vault download with a generic error while
-  fresh browsers worked. The app now calls `registration.update()` on every
-  launch: a redeployed build reaches returning devices on their second
-  launch, no manual cache clear. The backend also pins `Cache-Control:
-  no-cache` on `/sw.js` as defense in depth against intermediaries (gateway,
-  CDN, proxy) in front of it (ADR 0005). Devices frozen on builds from
-  before this change still need one manual site-data clear.
-
-### Added
-
-- **Android emulation e2e scenario** (`frontend/e2e/sync-android.spec.ts`):
-  the device-to-device sync flow with device 2 in Pixel 7 emulation, guarding
-  the mobile layout against desktop-only assumptions. The creation+upload
-  half both sync specs share now lives in `createFirstServiceAndUpload`
-  (`frontend/e2e/fixtures.ts`).
-
-### Tests
-
-- `e2e/sw-update.spec.ts` pins update propagation through the real build: a
-  returning device must pick up a redeployed build within two launches.
-  Removing `update()` from `register-sw.ts` turns it red (ADR 0005).
-
 ## 3.0.0
 
 2.x was a standalone offline password manager: one file, everything derived
@@ -74,7 +42,9 @@ read.
 - **Contract tests** (`backend/contract/`): a black-box suite that pins the
   wire protocol against a live binary — the safety net for any server change.
 - **End-to-end tests** (`frontend/e2e/`): Playwright against the real stack,
-  covering sign-in, device-to-device sync and the double-upload replay case.
+  covering sign-in, device-to-device sync (including the double-upload replay
+  case), file round-trip, the Android-emulation sync flow, and service-worker
+  update propagation through a real build.
 
 ### Changed
 
@@ -97,6 +67,19 @@ read.
 - Replayed requests: two identical requests within one second used to share
   a signature and the second was rejected; the v2 nonce makes each request
   unique.
+- **Returning devices received app updates only after a long delay.** The
+  service worker serves the single-file app shell cache-first, and the
+  browser's own update check is throttled: a registered worker is re-checked
+  on navigation, but at most once every 24 hours. A device therefore kept
+  serving the build it first cached (measured: zero update-check requests
+  over three launches) until the window expired, and a phone stuck on an
+  earlier build failed every vault download with a generic error while fresh
+  browsers worked. The app now calls `registration.update()` on every launch:
+  a redeployed build reaches returning devices on their second launch, no
+  manual cache clear. The backend also pins `Cache-Control: no-cache` on
+  `/sw.js` as defense in depth against intermediaries (gateway, CDN, proxy)
+  in front of it (ADR 0005). Devices frozen on builds from before this change
+  still need one manual site-data clear — see the upgrade notes.
 
 ### Security
 
@@ -123,3 +106,8 @@ read.
   unaffected.
 - The server stores credentials created by 2.x-era clients as-is; they are
   upgraded to the hashed form on the next successful PIN login.
+- **A device already running an older build does not update itself.** Builds
+  from before the update-on-launch change execute a shell that never asks the
+  server for a new worker, so they stay on whatever they first cached: clear
+  site data once by hand on such a device, then updates flow automatically
+  (ADR 0005).

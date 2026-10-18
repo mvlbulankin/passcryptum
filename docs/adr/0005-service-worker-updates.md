@@ -20,7 +20,7 @@ fetch bypasses the HTTP cache only after the same 24-hour window. A device
 launched a few times over a day therefore sends **zero** update-check
 requests (measured: three launches in Chromium, none observed) and keeps
 serving whatever build it first cached until the throttle expires. This
-shipped: an Android device stuck on a pre-fix-3.0.0 build failed every vault
+shipped: an Android device stuck on an earlier build failed every vault
 download (the download bug fixed in `3365b0a`) while fresh desktop browsers
 worked, and only a manual site-data clear recovered the phone.
 
