@@ -29,6 +29,9 @@ services:
     image: caddy:2
     volumes:
       - ./gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The Caddyfile imports this directory; without it Caddy refuses to
+      # start ("File to import not found").
+      - ./gateway/defaults:/etc/caddy/defaults:ro
       - caddy_data:/data
       - caddy_config:/config
     ports:
