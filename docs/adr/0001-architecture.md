@@ -6,8 +6,7 @@ Status: accepted
 ## Context
 
 Passcryptum 2.x was a standalone offline SPA. Version 3 adds server
-synchronization of the encrypted vault — the design recorded in the
-[upstream notes](../upstream/README.md) — which makes the project a
+synchronization of the encrypted vault, which makes the project a
 self-hosted full-stack application: a frontend, a backend, and a TLS entry
 point.
 

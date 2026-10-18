@@ -11,11 +11,7 @@ everything. Version 3 adds optional server synchronization of your
 encrypted vault between devices — the server stays zero-knowledge
 throughout.
 
-> This project continues [nelkor/passcryptum](https://github.com/nelkor/passcryptum)
-> (MIT, last release v2.1.4 — development stopped there). The server
-> synchronization follows the design sketched in its
-> [issue #187](https://github.com/nelkor/passcryptum/issues/187); a local
-> copy of the design notes lives in [docs/upstream](docs/upstream/).
+> This project continues [nelkor/passcryptum](https://github.com/nelkor/passcryptum).
 
 ## Getting started
 
@@ -49,7 +45,8 @@ independent of product versions (2.x → 3.x).
 
 ## Documentation
 
-- [docs/](docs/README.md) — user guides, architecture decisions (`docs/adr/`), upstream notes.
+- [docs/](docs/README.md) — user guides and architecture decisions.
+- [CHANGELOG.md](CHANGELOG.md) — what 3.0 changed against 2.x.
 - [GLOSSARY.md](GLOSSARY.md) — canonical domain terms.
 - [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md) —
   per-component developer docs.

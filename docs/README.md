@@ -1,6 +1,6 @@
 # Documentation
 
-Three kinds of documents, kept apart on purpose:
+Two kinds of documents, kept apart on purpose:
 
 - **[How to use Passcryptum](pin.md)** — user-facing guides:
   [PIN usage](pin.md), [recommendations](recommendations.md),
@@ -8,9 +8,6 @@ Three kinds of documents, kept apart on purpose:
 - **[Architecture decisions](adr/)** — why the system is built the way it
   is, one decision per record. Read the relevant record before changing an
   area it covers; do not re-litigate a decision without a new record.
-- **[Upstream notes](upstream/)** — local copies of the two issues from
-  [nelkor/passcryptum](https://github.com/nelkor/passcryptum) that define the
-  3.x direction (one implemented, one open).
 
 Per-component developer docs live next to their code:
 [backend](../backend/README.md), [frontend](../frontend/README.md),

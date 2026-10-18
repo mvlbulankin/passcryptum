@@ -5,7 +5,7 @@ Self-hosted zero-knowledge password manager: Go backend with an embedded Vue + T
 ## Repository map
 
 - `README.md` — product overview, deploy, links to the docs.
-- `docs/` — index in `docs/README.md`: user guides, `adr/` (decisions), `upstream/` (the upstream issues this project continues: #187 implemented, #159 open).
+- `docs/` — index in `docs/README.md`: user guides and `adr/` (decisions).
 - `GLOSSARY.md` — canonical domain terms (Origin Buffer, Profile, Credential, Protector, Entropy, Wire Protocol). Use these words exactly.
 - `backend/` — Go service (`internal/{wire,guard,store}`), see `backend/README.md`.
 - `frontend/` — Vue SPA (`modules/core/wire` is the protocol client), see `frontend/README.md`.
