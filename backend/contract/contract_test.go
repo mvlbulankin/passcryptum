@@ -37,6 +37,7 @@ const (
 	hdrProtector = "Protector"
 	hdrTimestamp = "Timestamp"
 	hdrSignature = "Signature"
+	hdrNonce     = "Nonce"
 
 	pathProfiles    = "/api/profiles/"
 	pathCredentials = "/api/credentials/"

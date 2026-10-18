@@ -26,7 +26,12 @@ const (
 	HdrProtector = "Protector"
 	HdrTimestamp = "Timestamp"
 	HdrSignature = "Signature"
+	HdrNonce     = "Nonce"
 )
+
+// nonceSize is the v2 replay nonce length (random per request, carried in
+// the signed message so same-second requests never share a signature).
+const nonceSize = 16
 
 // TimestampTolerance is the protocol's ±300 s request window (ADR-0002).
 const TimestampTolerance = 300 * time.Second
@@ -50,6 +55,7 @@ type Auth struct {
 	PublicB64 string
 	HashedPin string // b64 text as sent, "" if the recipe does not require it
 	Protector string // b64 text
+	Nonce     []byte // v2 only: random per request, part of the signed message
 	Payload   []byte // set for BodySigned recipes
 }
 
@@ -103,7 +109,7 @@ func WriteJSONString(w http.ResponseWriter, s string) {
 // cached old frontends keep working while their service worker updates.
 func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
 	auth := &Auth{}
-	var timestamp, signature []byte
+	var timestamp, signature, nonce []byte
 	v2 := r.Header.Get("Protocol-Version") == "2"
 
 	for _, name := range rec.Headers {
@@ -133,7 +139,38 @@ func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
 			timestamp = raw
 		case HdrSignature:
 			signature = raw
+		case HdrNonce:
+			nonce = raw
 		}
+	}
+
+	// v2 requires a nonce on signed requests (header recipes carry the
+	// Signature header; body recipes sign the payload) — unsigned credential
+	// requests keep their factor-auth quirk and no nonce: it is what makes every
+	// request's signature unique, so the replay cache never rejects a
+	// legitimate second request within the same timestamp second. It is
+	// parsed here (not via Recipe.Headers) so recipes stay declarative.
+	if v2 && (signature != nil || rec.BodySigned) {
+		nonce = nil
+
+		if raw := r.Header.Get(HdrNonce); raw != "" {
+			decoded, derr := base64.StdEncoding.DecodeString(raw)
+			if derr != nil {
+				return nil, errField(HdrNonce, "Invalid "+HdrNonce+" format")
+			}
+
+			nonce = decoded
+		}
+
+		if nonce == nil {
+			return nil, errField(HdrNonce, HdrNonce+" is required")
+		}
+
+		if len(nonce) != nonceSize {
+			return nil, errField(HdrNonce, "Invalid "+HdrNonce+" format")
+		}
+
+		auth.Nonce = nonce
 	}
 
 	if rec.BodySigned {
@@ -152,7 +189,7 @@ func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
 		msg := timestamp
 
 		if v2 {
-			msg = concat([]byte(r.Method), timestamp)
+			msg = concat(concat([]byte(r.Method), timestamp), nonce)
 		}
 
 		if err := verify(auth.PublicKey, msg, signature); err != nil {
@@ -163,7 +200,7 @@ func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
 	// v2: replay rejection covers GET/DELETE too — signatures now differ per
 	// request (fresh timestamp), so a repeat sighting is a replayed capture.
 	// Unsigned recipes have no signature to key on (and none to replay).
-	if v2 && signature != nil && g.RejectReplay(auth.PublicB64, signature) {
+	if v2 && signature != nil && g.RejectReplay(auth.PublicB64, replayBytes(signature, nonce)) {
 		return nil, &Error{Status: http.StatusForbidden, Reason: "replayed request"}
 	}
 
@@ -194,7 +231,7 @@ func parseSignedBody(r *http.Request, g *guard.Guard, auth *Auth, v2 bool) (*Aut
 	msg := concat(tstamp, payload)
 
 	if v2 {
-		msg = concat([]byte(r.Method), msg)
+		msg = concat(concat(concat([]byte(r.Method), tstamp), auth.Nonce), payload)
 	}
 
 	if err := verify(auth.PublicKey, msg, sig); err != nil {
@@ -239,6 +276,12 @@ func verify(pub ed25519.PublicKey, msg, sig []byte) *Error {
 	}
 
 	return nil
+}
+
+// replayBytes is the v2 replay-cache key material: the signature already
+// covers the nonce, concatenating keeps the call sites honest.
+func replayBytes(signature, nonce []byte) []byte {
+	return concat(signature, nonce)
 }
 
 func concat(a, b []byte) []byte {

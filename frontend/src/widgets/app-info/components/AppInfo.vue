@@ -8,20 +8,20 @@ import ExternalLink from './ExternalLink.vue'
 <template>
   <NCard title="For your information">
     <NP>
-      Working with the Passcryptum application takes&nbsp;place&nbsp;offline.
-      Any&nbsp;data&nbsp;processing is&nbsp;performed by&nbsp;your&nbsp;device.
+      Passcryptum works offline: all&nbsp;passwords are derived on&nbsp;your
+      device from your origin password.
     </NP>
 
     <NP>
-      You can
-      <GitHubLink path="/releases">download the application</GitHubLink>
-      to&nbsp;your&nbsp;computer to&nbsp;run&nbsp;it&nbsp;locally.
+      Online mode additionally keeps an&nbsp;encrypted copy of&nbsp;your
+      services on&nbsp;your own server, so&nbsp;your devices stay in&nbsp;sync.
+      The&nbsp;server cannot read it.
     </NP>
 
     <NP>
       Read
       <GitHubLink path="#passcryptum">the instructions</GitHubLink>
-      in our repository.
+      in&nbsp;our repository.
     </NP>
 
     <NP>

@@ -5,7 +5,7 @@ defineProps<{ path: string }>()
 </script>
 
 <template>
-  <ExternalLink :url="`github.com/nelkor/passcryptum${path}`">
+  <ExternalLink :url="`github.com/mvlbulankin/passcryptum${path}`">
     <slot />
   </ExternalLink>
 </template>

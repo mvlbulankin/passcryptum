@@ -253,14 +253,33 @@ func TestBodyRecipeRejectsReplay(t *testing.T) {
 // (0 <= now-ts <= 300), and replay rejection covers GET/DELETE too.
 
 func v2Headers(ts []byte, method string) map[string]string {
-	msg := signedMessage(method, ts, nil)
+	nonce := v2Nonce()
 
 	return map[string]string{
 		HdrPublicKey:       pubB64,
 		HdrTimestamp:       b64(ts),
-		HdrSignature:       b64(ed25519.Sign(priv, msg)),
+		HdrNonce:           b64(nonce),
+		HdrSignature:       b64(ed25519.Sign(priv, v2Message(method, ts, nonce, nil))),
 		"Protocol-Version": "2",
 	}
+}
+
+// v2Message: method ‖ ts ‖ nonce ‖ payload.
+func v2Message(method string, ts, nonce, payload []byte) []byte {
+	out := append([]byte{}, []byte(method)...)
+	out = append(out, ts...)
+	out = append(out, nonce...)
+
+	return append(out, payload...)
+}
+
+func v2Nonce() []byte {
+	n := make([]byte, nonceSize)
+	for i := range n {
+		n[i] = byte(i + 1)
+	}
+
+	return n
 }
 
 func signedMessage(method string, ts, payload []byte) []byte {
@@ -348,6 +367,8 @@ func TestV2BodySignatureBindsMethod(t *testing.T) {
 	payload := []byte("X")
 	ts := tsNow
 
+	nonce := v2Nonce()
+
 	body := func(sigMsg []byte) []byte {
 		sig := ed25519.Sign(priv, sigMsg)
 		raw := append(append(append([]byte{}, sig...), ts...), payload...)
@@ -355,9 +376,10 @@ func TestV2BodySignatureBindsMethod(t *testing.T) {
 		return []byte(b64(raw))
 	}
 
-	// Correct v2 body: signature over method ‖ ts ‖ payload.
-	r := httptest.NewRequest("POST", "/api/profiles/", bytes.NewReader(body(signedMessage("POST", ts, payload))))
+	// Correct v2 body: signature over method ‖ ts ‖ nonce ‖ payload.
+	r := httptest.NewRequest("POST", "/api/profiles/", bytes.NewReader(body(v2Message("POST", ts, nonce, payload))))
 	r.Header.Set(HdrPublicKey, pubB64)
+	r.Header.Set(HdrNonce, b64(nonce))
 	r.Header.Set("Protocol-Version", "2")
 
 	if _, err := ParseRequest(r, realGuard(), profilesPost); err != nil {
@@ -367,9 +389,51 @@ func TestV2BodySignatureBindsMethod(t *testing.T) {
 	// v1-style body signature (over ts ‖ payload only) must fail in v2.
 	r2 := httptest.NewRequest("POST", "/api/profiles/", bytes.NewReader(body(signedMessage("", ts, payload))))
 	r2.Header.Set(HdrPublicKey, pubB64)
+	r2.Header.Set(HdrNonce, b64(nonce))
 	r2.Header.Set("Protocol-Version", "2")
 
 	if _, err := ParseRequest(r2, realGuard(), profilesPost); err == nil {
 		t.Fatal("v2 must reject a body signature that does not bind the method")
+	}
+}
+
+// Regression: two identical requests in the same second used to share a
+// signature and trip the replay cache (a double GET failed the second time).
+func TestV2NonceMakesSameSecondRequestsDistinct(t *testing.T) {
+	g := realGuard()
+	ts := tsNow
+
+	for i := 0; i < 3; i++ {
+		r := httptest.NewRequest("GET", "/api/profiles/", nil)
+		nonce := make([]byte, nonceSize)
+		nonce[0] = byte(i + 1) // a different nonce per request
+
+		for k, v := range map[string]string{
+			HdrPublicKey:       pubB64,
+			HdrTimestamp:       b64(ts),
+			HdrNonce:           b64(nonce),
+			HdrSignature:       b64(ed25519.Sign(priv, v2Message("GET", ts, nonce, nil))),
+			"Protocol-Version": "2",
+		} {
+			r.Header.Set(k, v)
+		}
+
+		if _, err := ParseRequest(r, g, profilesGet); err != nil {
+			t.Fatalf("request %d with a fresh nonce must pass: %v", i+1, err)
+		}
+	}
+}
+
+func TestV2RequiresNonce(t *testing.T) {
+	r := httptest.NewRequest("GET", "/api/profiles/", nil)
+	for k, v := range v2Headers(tsNow, "GET") {
+		if k != HdrNonce {
+			r.Header.Set(k, v)
+		}
+	}
+
+	_, err := ParseRequest(r, realGuard(), profilesGet)
+	if err == nil || err.Field != HdrNonce || err.Status != 400 {
+		t.Fatalf("v2 without a nonce must be a 400 on Nonce, got %+v", err)
 	}
 }

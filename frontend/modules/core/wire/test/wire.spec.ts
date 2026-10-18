@@ -41,9 +41,9 @@ const fakeTransport =
     return Promise.resolve(responder())
   }
 
-// The GET/DELETE /api/profiles/ header recipe: Timestamp + Signature over
-// exactly the timestamp. Verifies the framing from the protocol spec, not by
-// recomputing the client's internals.
+// The GET/DELETE /api/profiles/ header recipe: Timestamp + Nonce + Signature
+// over method ‖ timestamp ‖ nonce. Verifies the framing from the protocol
+// spec, not by recomputing the client's internals.
 const expectSignedTimestampHeaders = (method: string) => {
   // v2: the request declares its protocol version (ADR-0003)
   expect(capturedRequest?.headers['Protocol-Version']).toBe('2')
@@ -62,8 +62,13 @@ const expectSignedTimestampHeaders = (method: string) => {
 
   expect(sigBytes).toHaveLength(64)
 
-  // v2: the signature covers method ‖ timestamp (ADR-0003)
-  const message = concat(methodBytes(method), tsBytes)
+  // v2: the signature covers method ‖ timestamp ‖ nonce (ADR-0003)
+  const nonce = fromB64(capturedRequest!.headers.Nonce)
+
+  expect(nonce).toHaveLength(16)
+
+  const message = concat(concat(methodBytes(method), tsBytes), nonce)
+
   expect(sign.detached.verify(message, sigBytes, publicKey)).toBe(true)
 }
 
@@ -75,6 +80,7 @@ const expectSignedBodyFraming = (method: string, payload: Uint8Array) => {
   expect(capturedRequest?.headers['Protocol-Version']).toBe('2')
 
   const raw = fromB64(capturedRequest!.body!)
+
   expect(raw).toHaveLength(64 + 4 + payload.length)
 
   const sig = raw.slice(0, 64)
@@ -83,7 +89,16 @@ const expectSignedBodyFraming = (method: string, payload: Uint8Array) => {
 
   expect(sent).toEqual(payload)
 
-  const message = concat(methodBytes(method), concat(tsBytes, sent))
+  // v2: the signature covers method ‖ ts ‖ nonce ‖ payload
+  const nonce = fromB64(capturedRequest!.headers.Nonce)
+
+  expect(nonce).toHaveLength(16)
+
+  const message = concat(
+    concat(methodBytes(method), concat(tsBytes, nonce)),
+    sent,
+  )
+
   expect(sign.detached.verify(message, sig, publicKey)).toBe(true)
 }
 

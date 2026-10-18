@@ -23,17 +23,20 @@ design:
 Version 2, negotiated by the `Protocol-Version: 2` header (ADR-0002 keeps
 v1 servable alongside):
 
-1. **Method-bound signatures.** v2 signs `method ‖ timestamp` (header
-   recipes) and `method ‖ ts ‖ payload` (body recipes). The wire framing is
-   unchanged; only the signature input grows. A captured GET signature no
-   longer verifies as DELETE.
+1. **Method-bound signatures with a per-request nonce.** v2 signs
+   `method ‖ ts ‖ nonce` (header recipes) and `method ‖ ts ‖ nonce ‖ payload`
+   (body recipes), where `nonce` is 16 random bytes sent in the `Nonce`
+   header. The wire framing is unchanged; only the signature input grows. A
+   captured GET signature no longer verifies as DELETE, and — because the
+   nonce differs per request — two requests in the same second never share a
+   signature (without it, a double GET collided with itself in the replay
+   cache: found by the live cross-language test).
 2. **One-sided window.** v2 accepts `0 ≤ now − ts ≤ 300`; timestamps from
    the future are rejected.
 3. **Replay rejection on every signed request.** v2 GET/DELETE are cached
-   in the replay cache as well. Signatures are now unique per request
-   (fresh timestamp), so legitimate traffic never collides — with one
-   accepted edge: two byte-identical requests within the same second share
-   a signature and the second gets 403.
+   in the replay cache as well, keyed by signature + nonce. The nonce makes
+   every legitimate request's signature unique, so no accepted edge
+   remains: an exact resubmission is a replay, and anything fresh passes.
 4. **Client-side PIN KDF.** The v2 wire value of `Hashed-Pin` is
    `PBKDF2-SHA512(SHA-512(pin), salt = profile public key, 600 000
    iterations, 32 bytes)`. The salt is the public key — not the protector,
@@ -45,6 +48,9 @@ v1 servable alongside):
    ~600k iterations per guess.
 5. **Minimum PIN length 8** enforced by the client at PIN-set time, bounding
    the dictionary space the KDF defends.
+
+Unsigned credential requests carry no nonce and keep their factor-auth
+quirk (no signature, therefore no replay key).
 
 Stripping the version header cannot downgrade a signed request: the v2
 signature does not verify under v1 rules (different message). For the

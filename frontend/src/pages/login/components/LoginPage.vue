@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, h  } from 'vue'
 import {
-  NA,
   NCard,
   NTabs,
   NSpace,
@@ -172,9 +171,5 @@ watch(hasPin, newHasPin => {
     </NCard>
 
     <AppInfo />
-
-    <NCard title="Previous version">
-      <NA href="https://v1.passcryptum.com">v1.passcryptum.com</NA>
-    </NCard>
   </NSpace>
 </template>

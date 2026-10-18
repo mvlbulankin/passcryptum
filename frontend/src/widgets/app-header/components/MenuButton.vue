@@ -120,7 +120,7 @@ const options = computed(() => [
       h(
         'a',
         {
-          href: 'https://github.com/nelkor/passcryptum',
+          href: 'https://github.com/mvlbulankin/passcryptum',
           target: '_blank',
           rel: 'noopener noreferrer',
         },

@@ -27,6 +27,7 @@ describe('computeWireHashedPin (protocol v2 wire value)', () => {
 
   it('is not the bare SHA-512 of the pin (the v1 wire value)', async () => {
     const wire = await computeWireHashedPin('pin', publicKey)
+
     const bare = new Uint8Array(
       await crypto.subtle.digest('SHA-512', new TextEncoder().encode('pin')),
     )

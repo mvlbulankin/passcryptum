@@ -12,12 +12,23 @@ import (
 	"time"
 )
 
-// v2Message is the v2 signed message: method ‖ timestamp ‖ payload.
-func v2Message(method string, tstamp, payload []byte) []byte {
+// v2Message is the v2 signed message: method ‖ timestamp ‖ nonce ‖ payload.
+func v2Message(method string, tstamp, nonce, payload []byte) []byte {
 	m := append([]byte{}, []byte(method)...)
 	m = append(m, tstamp...)
+	m = append(m, nonce...)
 
 	return append(m, payload...)
+}
+
+// v2Nonce returns 16 distinct bytes — the per-request replay nonce.
+func v2Nonce(seed byte) []byte {
+	n := make([]byte, 16)
+	for i := range n {
+		n[i] = seed + byte(i)
+	}
+
+	return n
 }
 
 // v2Do sends a v2 request. Signed headers (Timestamp/Signature) cover the
@@ -32,11 +43,12 @@ func (c *client) v2Do(method, path string, body []byte, headers map[string][]byt
 	return c.doRaw(method, path, body, raw)
 }
 
-func (c *client) v2SignedHeaders(method string, tstamp []byte) map[string][]byte {
+func (c *client) v2SignedHeaders(method string, tstamp []byte, nonce []byte) map[string][]byte {
 	return map[string][]byte{
 		hdrPublicKey: c.pub,
 		hdrTimestamp: tstamp,
-		hdrSignature: ed25519.Sign(c.priv, v2Message(method, tstamp, nil)),
+		hdrNonce:     nonce,
+		hdrSignature: ed25519.Sign(c.priv, v2Message(method, tstamp, nonce, nil)),
 	}
 }
 
@@ -44,13 +56,13 @@ func TestV2MethodBoundSignatures(t *testing.T) {
 	c := newClient(t)
 
 	t.Run("GET with method-bound signature works", func(t *testing.T) {
-		if code, body := c.v2Do("GET", pathProfiles, nil, c.v2SignedHeaders("GET", ts(0))); code != 204 && code != 200 {
+		if code, body := c.v2Do("GET", pathProfiles, nil, c.v2SignedHeaders("GET", ts(0), v2Nonce(1))); code != 204 && code != 200 {
 			t.Fatalf("v2 GET: got %d %q, want 204/200", code, body)
 		}
 	})
 
 	t.Run("captured GET signature fails as DELETE", func(t *testing.T) {
-		code, body := c.v2Do("DELETE", pathProfiles, nil, c.v2SignedHeaders("GET", ts(0)))
+		code, body := c.v2Do("DELETE", pathProfiles, nil, c.v2SignedHeaders("GET", ts(0), v2Nonce(1)))
 		if code != 400 {
 			t.Fatalf("v2 GET-as-DELETE: got %d %q, want 400 (signature mismatch)", code, body)
 		}
@@ -59,9 +71,10 @@ func TestV2MethodBoundSignatures(t *testing.T) {
 	t.Run("POST body signature binds the method", func(t *testing.T) {
 		tt := ts(0)
 		payload := []byte(`{"services":{"v2":{}}}`)
-		sig := ed25519.Sign(c.priv, v2Message("POST", tt, payload))
+		nonce := v2Nonce(20)
+		sig := ed25519.Sign(c.priv, v2Message("POST", tt, nonce, payload))
 		body := []byte(b64(append(append(append([]byte{}, sig...), tt...), payload...)))
-		pb := map[string][]byte{hdrPublicKey: c.pub}
+		pb := map[string][]byte{hdrPublicKey: c.pub, hdrNonce: nonce}
 
 		if code, resp := c.v2Do("POST", pathProfiles, body, pb); code != 200 {
 			t.Fatalf("v2 POST: got %d %q, want 200", code, resp)
@@ -84,11 +97,11 @@ func TestV2OneSidedWindow(t *testing.T) {
 
 	// Pre-issued (+299 s) is a pinned v1 quirk (TestProfilesQuirkPreIssued)
 	// but must be rejected under v2.
-	if code, _ := c.v2Do("GET", pathProfiles, nil, c.v2SignedHeaders("GET", ts(299))); code != 400 {
+	if code, _ := c.v2Do("GET", pathProfiles, nil, c.v2SignedHeaders("GET", ts(299), v2Nonce(2))); code != 400 {
 		t.Fatalf("v2 pre-issued GET: got %d, want 400", code)
 	}
 
-	if code, _ := c.v2Do("GET", pathProfiles, nil, c.v2SignedHeaders("GET", ts(-299))); code > 299 {
+	if code, _ := c.v2Do("GET", pathProfiles, nil, c.v2SignedHeaders("GET", ts(-299), v2Nonce(3))); code > 299 {
 		t.Fatalf("v2 recent GET must pass, got %d", code)
 	}
 }
@@ -98,7 +111,7 @@ func TestV2GETReplayRejected(t *testing.T) {
 
 	// A distinct offset: other tests' GETs at ts(0) in the same second would
 	// otherwise collide in the replay cache (identical signed bytes).
-	headers := c.v2SignedHeaders("GET", ts(-2))
+	headers := c.v2SignedHeaders("GET", ts(-2), v2Nonce(9))
 
 	if code, _ := c.v2Do("GET", pathProfiles, nil, headers); code > 299 {
 		t.Fatalf("first sighting must pass, got %d", code)
@@ -119,12 +132,14 @@ func TestV2UnsignedCredentialGetStillWorks(t *testing.T) {
 	pin := []byte("V2-PIN")
 	tt := ts(0)
 	entropy := []byte("V2-ENTROPY")
-	sig := ed25519.Sign(c.priv, v2Message("POST", tt, entropy))
+	nonce := v2Nonce(30)
+	sig := ed25519.Sign(c.priv, v2Message("POST", tt, nonce, entropy))
 	body := []byte(b64(append(append(append([]byte{}, sig...), tt...), entropy...)))
 
 	code, resp := c.v2Do("POST", pathCredentials, body, map[string][]byte{
 		hdrPublicKey: c.pub,
 		hdrHashedPin: pin,
+		hdrNonce:     nonce,
 	})
 	if code != 200 {
 		t.Fatalf("v2 create credential: got %d %q, want 200", code, resp)

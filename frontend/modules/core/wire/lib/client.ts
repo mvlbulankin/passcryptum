@@ -4,7 +4,12 @@ import {
   uint8ArrayToBase64,
 } from '../../shared'
 import { WireError } from './wire-error'
-import { concatUint8Arrays, createSignature, generateTimestamp } from './protocol'
+import {
+  concatUint8Arrays,
+  createSignature,
+  generateNonce,
+  generateTimestamp,
+} from './protocol'
 import { profilesUrl, credentialsUrl } from './urls'
 import type { Transport, WireClient, WireRequest } from './types'
 
@@ -17,17 +22,30 @@ const versionHeaders = { 'Protocol-Version': protocolVersion }
 
 const methodBytes = (method: string) => new TextEncoder().encode(method)
 
-// v2 signed messages: method ‖ timestamp (header recipes) and
-// method ‖ timestamp ‖ payload (body recipes).
-const headerMessage = (method: string, timestamp: Uint8Array) =>
-  concatUint8Arrays(methodBytes(method), timestamp)
+// v2 signed messages: method ‖ timestamp ‖ nonce (header recipes) and
+// method ‖ timestamp ‖ nonce ‖ payload (body recipes). The nonce is what
+// keeps two requests in the same second from sharing a signature.
+const headerMessage = (
+  method: string,
+  timestamp: Uint8Array,
+  nonce: Uint8Array,
+) => concatUint8Arrays(concatUint8Arrays(methodBytes(method), timestamp), nonce)
 
 // b64(sig ‖ ts ‖ payload) with the v2 signature over method ‖ ts ‖ payload.
-const signedBody = (method: string, secretKey: Uint8Array, payload: Uint8Array) => {
+const signedBody = (
+  method: string,
+  secretKey: Uint8Array,
+  payload: Uint8Array,
+  nonce: Uint8Array,
+) => {
   const timestamp = generateTimestamp()
   const combined = concatUint8Arrays(timestamp, payload)
+
   const signature = createSignature(
-    concatUint8Arrays(methodBytes(method), combined),
+    concatUint8Arrays(
+      concatUint8Arrays(methodBytes(method), concatUint8Arrays(timestamp, nonce)),
+      payload,
+    ),
     secretKey,
   )
 
@@ -70,7 +88,12 @@ export const createWireClient = (transport: Transport): WireClient => {
   const getServices = async (keyPairSeed: Uint8Array) => {
     const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
     const timestamp = generateTimestamp()
-    const signature = createSignature(headerMessage('GET', timestamp), secretKey)
+    const nonce = generateNonce()
+
+    const signature = createSignature(
+      headerMessage('GET', timestamp, nonce),
+      secretKey,
+    )
 
     const { status, body } = await send(transport, {
       method: 'GET',
@@ -80,6 +103,7 @@ export const createWireClient = (transport: Transport): WireClient => {
         'Content-Type': 'application/json',
         'Public-Key': uint8ArrayToBase64(publicKey),
         'Timestamp': uint8ArrayToBase64(timestamp),
+        'Nonce': uint8ArrayToBase64(nonce),
         'Signature': uint8ArrayToBase64(signature),
       },
     })
@@ -97,15 +121,17 @@ export const createWireClient = (transport: Transport): WireClient => {
 
   const setServices = async (keyPairSeed: Uint8Array, encrypted: Uint8Array) => {
     const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
+    const nonce = generateNonce()
 
     const { status } = await send(transport, {
       method: 'POST',
       url: profilesUrl(),
-      body: signedBody('POST', secretKey, encrypted),
+      body: signedBody('POST', secretKey, encrypted, nonce),
       headers: {
         ...versionHeaders,
         'Content-Type': 'application/json',
         'Public-Key': uint8ArrayToBase64(publicKey),
+        'Nonce': uint8ArrayToBase64(nonce),
       },
     })
 
@@ -119,7 +145,12 @@ export const createWireClient = (transport: Transport): WireClient => {
   ): Promise<'cleared' | 'already-empty'> => {
     const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
     const timestamp = generateTimestamp()
-    const signature = createSignature(headerMessage('DELETE', timestamp), secretKey)
+    const nonce = generateNonce()
+
+    const signature = createSignature(
+      headerMessage('DELETE', timestamp, nonce),
+      secretKey,
+    )
 
     const { status } = await send(transport, {
       method: 'DELETE',
@@ -129,6 +160,7 @@ export const createWireClient = (transport: Transport): WireClient => {
         'Content-Type': 'application/json',
         'Public-Key': uint8ArrayToBase64(publicKey),
         'Timestamp': uint8ArrayToBase64(timestamp),
+        'Nonce': uint8ArrayToBase64(nonce),
         'Signature': uint8ArrayToBase64(signature),
       },
     })
@@ -175,16 +207,18 @@ export const createWireClient = (transport: Transport): WireClient => {
     entropy: Uint8Array,
   ) => {
     const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
+    const nonce = generateNonce()
 
     const { status, body } = await send(transport, {
       method: 'POST',
       url: credentialsUrl(),
-      body: signedBody('POST', secretKey, entropy),
+      body: signedBody('POST', secretKey, entropy, nonce),
       headers: {
         ...versionHeaders,
         'Content-Type': 'application/json',
         'Public-Key': uint8ArrayToBase64(publicKey),
         'Hashed-Pin': uint8ArrayToBase64(hashedPin),
+        'Nonce': uint8ArrayToBase64(nonce),
       },
     })
 

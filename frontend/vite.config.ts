@@ -5,6 +5,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 
+const pkg = JSON.parse(readFileSync(resolve('package.json'), 'utf-8'))
+
 // Bump the service-worker cache version with every build so a fresh build
 // actually reaches returning users (the SW serves cached shells forever
 // otherwise). CACHE_VERSION lives in public/sw.js -> dist/sw.js.
@@ -30,6 +32,9 @@ const swVersionPlugin = {
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     alias: {
       '#': resolve('modules'),

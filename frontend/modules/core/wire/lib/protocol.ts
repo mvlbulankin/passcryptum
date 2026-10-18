@@ -13,6 +13,12 @@ export const generateTimestamp = (): Uint8Array => {
   return new Uint8Array(buffer)
 }
 
+// v2 nonce: 16 random bytes, carried in the signed message so two requests
+// in the same second never share a signature (the server's replay cache keys
+// on the signature; without a nonce a double GET collides with itself).
+export const generateNonce = (): Uint8Array =>
+  crypto.getRandomValues(new Uint8Array(16))
+
 export const concatUint8Arrays = (array1: Uint8Array, array2: Uint8Array) => {
   const tmp = new Uint8Array(array1.length + array2.length)
 
