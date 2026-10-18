@@ -168,3 +168,6 @@ passcryptum.db
 
 # local scratch notes (not documentation)
 .scratch/
+
+# build output the e2e stack embeds into backend/web
+backend/web/

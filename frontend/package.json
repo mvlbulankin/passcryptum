@@ -8,9 +8,11 @@
     "format": "prettier . --ignore-path .gitignore --check",
     "format:fix": "prettier . --ignore-path .gitignore --write",
     "lint": "eslint . && stylelint \"**/*.scss\"",
-    "lint:fix": "eslint . --fix && stylelint --fix \"**/*.scss\""
+    "lint:fix": "eslint . --fix && stylelint --fix \"**/*.scss\"",
+    "test:e2e": "./e2e/run.sh"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/node": "^26.6.5",
     "@types/serviceworker": "^0.0.203",
     "@vitejs/plugin-vue": "^6.0.10",

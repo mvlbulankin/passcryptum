@@ -18,6 +18,11 @@ export {
   uint8ArrayToBase64,
 } from './shared'
 
+// Actions: AES blob helpers (legacy + v2 envelope) and pin derivation.
+export { decryptBlob, createPinAesData } from './actions'
+
+export { getEncryptedHash, getEncryptedOnlineHash } from './actions'
+
 export { generatePassword } from './generator'
 
 // Wire Protocol client (ADR-0002): the only way the app talks to the server.
