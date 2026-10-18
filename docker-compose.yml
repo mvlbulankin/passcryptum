@@ -1,4 +1,4 @@
-# Passcryptum: two containers (ADR-0003) — Go binary (API + embedded SPA +
+# Passcryptum: two containers (ADR-0001) — Go binary (API + embedded SPA +
 # SQLite) behind Caddy (automatic TLS for the ddns domain, security headers).
 #
 # Build from the repo root:

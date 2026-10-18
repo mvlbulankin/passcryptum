@@ -159,7 +159,7 @@ cython_debug/
 .DS_Store
 
 # local dev/db artifacts
-backend/passcryptum.db
+passcryptum.db
 *.sqlite3
 
 # local agent tooling — deliberately untracked
