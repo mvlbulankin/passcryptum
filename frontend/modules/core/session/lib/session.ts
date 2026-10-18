@@ -7,7 +7,8 @@ import {
   decrypt,
   getBufferOfText,
   pbkdf2,
-  uint8ArrayToBase64, getKeyPairFromSeed 
+  uint8ArrayToBase64,
+  getKeyPairFromSeed,
 } from '../../shared'
 import {
   ORIGIN_BUFFER_BYTE_LENGTH,
