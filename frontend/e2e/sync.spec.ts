@@ -1,5 +1,11 @@
 import { test, expect } from './test'
-import { acceptOnlineMode, openStorage, signInWithPassword } from './fixtures'
+import {
+  acceptOnlineMode,
+  createFirstServiceAndUpload,
+  openStorage,
+  pullVaultDown,
+  signInWithPassword,
+} from './fixtures'
 
 // The headline 3.x capability: an encrypted vault synchronized between
 // devices through a self-hosted server. Device 1 creates a service and
@@ -22,22 +28,7 @@ test.describe('server synchronization', () => {
     await page1.goto('/')
     await signInWithPassword(page1, ORIGIN_PASSWORD)
     await acceptOnlineMode(page1)
-
-    await page1.getByRole('button', { name: 'Create the first one' }).click()
-    await page1.getByPlaceholder('Enter service name').fill(SERVICE)
-    await page1.getByPlaceholder('Enter login').fill(LOGIN)
-    await page1.getByRole('button', { name: 'Continue' }).click()
-
-    await expect(page1.getByText(SERVICE).first()).toBeVisible({ timeout: 15_000 })
-
-    await openStorage(page1)
-    await page1.getByRole('button', { name: 'Upload services to server' }).click()
-
-    // Destructive server actions ask for confirmation.
-    await page1.getByRole('button', { name: 'Upload', exact: true }).click()
-    await expect(page1.getByText(/uploaded to server successfully/i)).toBeVisible({
-      timeout: 60_000,
-    })
+    await createFirstServiceAndUpload(page1, SERVICE, LOGIN)
 
     // --- device 2: a clean browser context, same origin password ---
     const device2 = await browser.newContext({ ignoreHTTPSErrors: true })
@@ -50,13 +41,7 @@ test.describe('server synchronization', () => {
     // Accepting online mode on a fresh device already pulls the vault, so the
     // device may show data straight away; pulling again must be idempotent
     // and the service must be present.
-    await openStorage(page2)
-    await page2.getByRole('button', { name: 'Download services from server' }).click()
-    await expect(
-      page2
-        .getByText(/downloaded from server successfully|Parsed services is empty/i)
-        .first(),
-    ).toBeVisible({ timeout: 60_000 })
+    await pullVaultDown(page2)
 
     await expect(page2.getByText(SERVICE).first()).toBeVisible()
 
@@ -75,7 +60,9 @@ test.describe('server synchronization', () => {
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       await openStorage(page)
-      await page.getByRole('button', { name: 'Upload services to server' }).click()
+      await page
+        .getByRole('button', { name: 'Upload services to server' })
+        .click()
       await page.getByRole('button', { name: 'Upload', exact: true }).click()
 
       await expect(

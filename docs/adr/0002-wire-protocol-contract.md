@@ -36,5 +36,9 @@ detail:
 ## Consequences
 
 Frontends update at their own pace (the service worker refreshes shells);
-the server never forces a coordinated upgrade. Carrying two protocol
-versions is permanent maintenance cost, accepted for unbreakable clients.
+the server never forces a coordinated upgrade. Shell refresh is not prompt,
+though — see [ADR-0005](0005-service-worker-updates.md): the browser's own
+update check is throttled to once per 24 hours, so a stale shell can outlive
+a deploy. That is exactly why v1 must stay servable indefinitely. Carrying
+two protocol versions is permanent maintenance cost, accepted for
+unbreakable clients.

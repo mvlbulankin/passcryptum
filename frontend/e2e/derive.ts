@@ -11,7 +11,9 @@ import nacl from 'tweetnacl'
 const ORIGIN_BUFFER_BYTE_LENGTH = 256
 const ORIGIN_BUFFER_ITERATIONS = 2 ** 18 // 262144
 
-export async function deriveOriginBuffer(password: string): Promise<Uint8Array> {
+export async function deriveOriginBuffer(
+  password: string,
+): Promise<Uint8Array> {
   const buffer = new TextEncoder().encode(password)
 
   const [key, salt] = await Promise.all([

@@ -11,7 +11,9 @@ const ORIGIN_PASSWORD = 'file round trip e2e'
 const SERVICE = 'filehost.com'
 
 test.describe('file export and import', () => {
-  test('an exported vault file imports on another device', async ({ browser }) => {
+  test('an exported vault file imports on another device', async ({
+    browser,
+  }) => {
     const device1 = await browser.newContext({ ignoreHTTPSErrors: true })
     const page1 = await device1.newPage()
 

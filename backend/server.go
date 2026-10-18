@@ -52,17 +52,9 @@ type server struct {
 func serve(st *store.Store, g *guard.Guard, addr string) error {
 	s := &server{st: st, g: g, now: time.Now}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/profiles/", s.handleProfiles)
-	mux.HandleFunc("/api/credentials/", s.handleCredentials)
-
-	if web, err := fs.Sub(webFS, "web"); err == nil {
-		mux.Handle("/", http.FileServer(http.FS(web)))
-	}
-
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           s.rateLimitAPI(mux),
+		Handler:           s.rateLimitAPI(s.mux()),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second, // slow-body connection-hold DoS
 		WriteTimeout:      60 * time.Second,
@@ -71,6 +63,38 @@ func serve(st *store.Store, g *guard.Guard, addr string) error {
 	log.Printf("passcryptum listening on %s (db: %s)", addr, st.Path())
 
 	return srv.ListenAndServe()
+}
+
+// mux is the route table, separate from serve() so tests can exercise the
+// wired handler chain (the middleware actually being mounted is not
+// observable from a handler in isolation).
+func (s *server) mux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/profiles/", s.handleProfiles)
+	mux.HandleFunc("/api/credentials/", s.handleCredentials)
+
+	if web, err := fs.Sub(webFS, "web"); err == nil {
+		mux.Handle("/", swJSNoCache(http.FileServer(http.FS(web))))
+	}
+
+	return mux
+}
+
+// swJSNoCache pins revalidation for the service-worker script. The browser's
+// own update check already bypasses the HTTP cache for that script (default
+// updateViaCache: "imports"); this covers the hops it cannot see — the Caddy
+// gateway, a CDN, a proxy — where a stored sw.js would otherwise answer the
+// revalidation with a stale worker and freeze the device on the app build it
+// first cached (the shell itself is served cache-first by the worker).
+// no-cache allows storing but forces revalidation.
+func swJSNoCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/sw.js" {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // rateLimitAPI applies the per-IP sliding window to the API only —

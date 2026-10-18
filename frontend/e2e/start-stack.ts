@@ -34,15 +34,16 @@ const main = async () => {
   console.log('[e2e] building the frontend...')
   spawnSyncOrThrow('npm', ['run', 'build'], frontendDir)
   rmSync(join(backendDir, 'web'), { recursive: true, force: true })
-  cpSync(join(frontendDir, 'dist'), join(backendDir, 'web'), { recursive: true })
+  cpSync(join(frontendDir, 'dist'), join(backendDir, 'web'), {
+    recursive: true,
+  })
 
   console.log('[e2e] building the binary...')
   spawnSyncOrThrow('go', ['build', '-o', bin, '.'], backendDir)
 
   const env = { ...process.env, PC_DB: dbPath }
 
-  const run = (args: string[]) =>
-    spawnSyncOrThrow(bin, args, backendDir, env)
+  const run = (args: string[]) => spawnSyncOrThrow(bin, args, backendDir, env)
 
   const keys = run(['genkey'])
   const seed = keys.match(/seed\(private\):\s+(\S+)/)?.[1] as string
@@ -54,7 +55,9 @@ const main = async () => {
   for (const password of E2E_PASSWORDS) {
     const derived = await derivePublicKey(password)
 
-    console.log(`[e2e] onboard ${JSON.stringify(password)} -> ${derived.slice(0, 12)}`)
+    console.log(
+      `[e2e] onboard ${JSON.stringify(password)} -> ${derived.slice(0, 12)}`,
+    )
     console.log(run(['add-public-key', derived]).trim())
   }
 

@@ -6,4 +6,5 @@ export const E2E_PASSWORDS = [
   'definitely not the password',
   'sync between devices e2e',
   'file round trip e2e',
+  'android emulation e2e',
 ]

@@ -4,6 +4,38 @@ All notable changes to Passcryptum. This project continues
 [nelkor/passcryptum](https://github.com/nelkor/passcryptum) (v2.1.4 was its
 last release).
 
+## Unreleased
+
+### Fixed
+
+- **Returning devices received app updates only after a long delay.** The
+  service worker serves the single-file app shell cache-first, and the
+  browser's own update check is throttled: a registered worker is re-checked
+  on navigation, but at most once every 24 hours. A device therefore kept
+  serving the build it first cached (measured: zero update-check requests
+  over three launches) until the window expired. A phone frozen on a
+  pre-fix 3.0.0 build failed every vault download with a generic error while
+  fresh browsers worked. The app now calls `registration.update()` on every
+  launch: a redeployed build reaches returning devices on their second
+  launch, no manual cache clear. The backend also pins `Cache-Control:
+  no-cache` on `/sw.js` as defense in depth against intermediaries (gateway,
+  CDN, proxy) in front of it (ADR 0005). Devices frozen on builds from
+  before this change still need one manual site-data clear.
+
+### Added
+
+- **Android emulation e2e scenario** (`frontend/e2e/sync-android.spec.ts`):
+  the device-to-device sync flow with device 2 in Pixel 7 emulation, guarding
+  the mobile layout against desktop-only assumptions. The creation+upload
+  half both sync specs share now lives in `createFirstServiceAndUpload`
+  (`frontend/e2e/fixtures.ts`).
+
+### Tests
+
+- `e2e/sw-update.spec.ts` pins update propagation through the real build: a
+  returning device must pick up a redeployed build within two launches.
+  Removing `update()` from `register-sw.ts` turns it red (ADR 0005).
+
 ## 3.0.0
 
 2.x was a standalone offline password manager: one file, everything derived

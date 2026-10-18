@@ -25,6 +25,7 @@ root [GLOSSARY](../GLOSSARY.md); work conventions for agents are in
 | [0002](adr/0002-wire-protocol-contract.md) | The Wire Protocol is a versioned public contract | accepted |
 | [0003](adr/0003-protocol-v2.md) | Protocol v2: method-bound signatures with nonce, one-sided window, replay on all signed requests, client-side PIN KDF | accepted |
 | [0004](adr/0004-salt-less-origin-derivation.md) | Salt-less origin buffer derivation is accepted deliberately | accepted |
+| [0005](adr/0005-service-worker-updates.md) | App updates are pulled by `registration.update()` on launch; browser soft-updates (≤24 h throttle) are too slow to rely on | accepted |
 
 New records: copy the shape of an existing one, number sequentially, and add
 the row above.

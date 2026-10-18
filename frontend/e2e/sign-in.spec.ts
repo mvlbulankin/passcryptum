@@ -27,7 +27,9 @@ test.describe('sign in', () => {
     // The session lives on after a reload (derived material is re-derived
     // from storage; the vault is not lost).
     await page.reload()
-    await expect(page.getByRole('heading', { name: 'Sign in' }).first()).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Sign in' }).first(),
+    ).toBeVisible()
   })
 
   test('another origin password opens a different, empty vault', async ({

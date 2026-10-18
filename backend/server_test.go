@@ -271,6 +271,56 @@ func TestCredentialsPostIssuesAProtector(t *testing.T) {
 	}
 }
 
+// The worker script is the only asset that must revalidate, and only for the
+// hops the browser cannot bypass on its own (gateway, CDN, proxy): a stale
+// sw.js answers the update check with the old worker and freezes the device
+// on its first-cached app build.
+func TestSwJSNoCache(t *testing.T) {
+	t.Run("only /sw.js is marked", func(t *testing.T) {
+		base := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		handler := swJSNoCache(base)
+
+		for path, want := range map[string]string{
+			"/sw.js":         "no-cache",
+			"/index.html":    "",
+			"/api/profiles/": "",
+		} {
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+
+			if got := w.Header().Get("Cache-Control"); got != want {
+				t.Fatalf("%s Cache-Control: got %q, want %q", path, got, want)
+			}
+		}
+	})
+
+	t.Run("wired into the mux", func(t *testing.T) {
+		// The subtest above would stay green if the wrapper were dropped from
+		// serve(): nothing else pins that the middleware is actually mounted.
+		st, err := store.Open(":memory:")
+		if err != nil {
+			t.Fatalf("store: %v", err)
+		}
+		t.Cleanup(func() { st.Close() })
+
+		h := (&server{
+			st:  st,
+			g:   guard.New(300, 100, 2*wire.TimestampTolerance, time.Now),
+			now: time.Now,
+		}).mux()
+
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/sw.js", nil))
+
+		if got := w.Header().Get("Cache-Control"); got != "no-cache" {
+			t.Fatalf("/sw.js through the mux: Cache-Control %q, want %q", got, "no-cache")
+		}
+	})
+}
+
 func TestMethodNotAllowed(t *testing.T) {
 	f := newFixture(t)
 
