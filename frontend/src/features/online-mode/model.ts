@@ -1,12 +1,15 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 
-import { lsKey, modeVariants } from './constants'
+import { session, sessionRevision } from '@/entities/session'
 
-const lsMode = localStorage.getItem(lsKey)
-const isLsOnlineMode = lsMode === modeVariants.online
+// The mode lives in the session; this is the Vue-facing projection of it.
+// `sessionRevision` makes the computed re-evaluate when the mode changes.
+export const isOnlineMode = computed(() => {
+  void sessionRevision.value
 
-export const isOnlineMode = ref(lsMode ? isLsOnlineMode : false)
+  return session.mode() === 'online'
+})
 
 export const mode = computed(() =>
-  isOnlineMode.value ? modeVariants.online : modeVariants.offline,
+  session.mode() === 'online' ? 'Online' : 'Offline',
 )

@@ -1,12 +1,7 @@
 import { useDialog, useMessage, useLoadingBar } from 'naive-ui'
-import {
-  encryptData,
-  getSession,
-  getVault,
-  isForbidden,
-  wire,
-} from '#/core'
+import { encryptData, isForbidden, wire } from '#/core'
 
+import { session } from '@/entities/session'
 import { showStorageDrawer } from '@/features/storage/model'
 
 import { showPublicKeyError } from './public-key-error'
@@ -23,7 +18,7 @@ export const useUploadServices = () => {
       // The vault knows how Services are stored; the transport wraps those
       // bytes in a secretbox bound to this session's keys. Two concerns,
       // two owners — the composition is three lines.
-      const bytes = await getVault().exportBytes()
+      const bytes = await session.vault().exportBytes()
 
       if (!bytes) {
         message.error('There is nothing to upload')
@@ -31,10 +26,10 @@ export const useUploadServices = () => {
         return
       }
 
-      const { keyPairSeed, secretBoxIv, secretBoxKey } = getSession()
+      const { secretBoxIv, secretBoxKey } = session.transportKeys()
       const envelope = encryptData(bytes, secretBoxIv, secretBoxKey)
 
-      await wire.setServices(keyPairSeed, envelope)
+      await wire.setServices(session.keyPairSeed(), envelope)
       message.success('Services have been uploaded to server successfully')
     } catch (e) {
       if (isForbidden(e)) {

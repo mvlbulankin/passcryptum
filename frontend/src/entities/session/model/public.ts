@@ -10,32 +10,31 @@ import {
   updateServicePreferences,
 } from '#/services'
 import { ref, computed } from 'vue'
-import { getVault } from '#/core'
 
-import {
-  privateServices,
-  privateSessionId,
-  privateIsOnlinePinSet,
-  privateIsOfflinePinSet,
-} from './private'
+import { privateServices, privateSessionId, session } from './private'
 
 export const isCalculationInProgress = ref(false)
 
-export const isOnlinePinSet = computed(() => privateIsOnlinePinSet.value)
+// PIN availability is derived from the session (which derives it from
+// storage), not snapshotted — so it cannot go stale behind a setter nobody
+// remembered to call. The ref only exists to re-evaluate on session changes.
+export const sessionRevision = ref(0)
 
-export const setOnlinePinState = (value: boolean) => {
-  privateIsOnlinePinSet.value = value
-}
+session.subscribe(() => {
+  sessionRevision.value += 1
+})
 
-export const isOfflinePinSet = computed(() => privateIsOfflinePinSet.value)
+export const isOnlinePinSet = computed(
+  () => sessionRevision.value >= 0 && session.isOnlinePinSet(),
+)
 
-export const setOfflinePinState = (value: boolean) => {
-  privateIsOfflinePinSet.value = value
-}
+export const isOfflinePinSet = computed(
+  () => sessionRevision.value >= 0 && session.isOfflinePinSet(),
+)
 
 export const sessionId = computed(() => privateSessionId.value)
 
-const saveServices = () => getVault().write(privateServices.value)
+const saveServices = () => session.vault().write(privateServices.value)
 
 export const addServiceAndLogin = (serviceName: string, loginName: string) => {
   add(privateServices.value, serviceName.trim(), loginName.trim())
@@ -57,7 +56,7 @@ export const areServicesEmpty = computed(() =>
 )
 
 export const clearServices = () => {
-  void getVault().clear()
+  void session.vault().clear()
 
   privateServices.value = createEmptyServices()
 }

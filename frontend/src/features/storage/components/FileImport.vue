@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { DocumentOutline } from '@vicons/ionicons5'
 import { NH4, NButton, useMessage, useLoadingBar } from 'naive-ui'
-import { getVault } from '#/core'
 import { checkForEmptiness } from '#/services'
 
-import { importServices } from '@/entities/session'
+import { session, importServices  } from '@/entities/session'
+
 
 const message = useMessage()
 const loadingBar = useLoadingBar()
@@ -27,7 +27,7 @@ element.addEventListener('change', async () => {
 
   loadingBar.start()
 
-  const config = await getVault().importBytes(await file.arrayBuffer())
+  const config = await session.vault().importBytes(await file.arrayBuffer())
 
   if (!config || checkForEmptiness(config)) {
     loadingBar.error()

@@ -1,8 +1,7 @@
-import { useDialog } from 'naive-ui'
-import { bufferToBase64, getKeyPairFromSeed, uint8ArrayToBase64 } from '#/core'
-
-import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
-
+import {
+  bufferToBase64,
+  uint8ArrayToBase64, encrypt, generateRandomString 
+} from '../../shared'
 import { wire, isForbidden } from '../../wire'
 import {
   LS_KEY_PIN,
@@ -10,56 +9,56 @@ import {
   LS_KEY_PUBLIC_KEY,
   LS_KEY_RANDOM_STRING,
 } from '../../constants'
-import { encrypt, generateRandomString } from '../../shared'
-import { getSession } from '../../session'
 import { createPinAesData, computeWireHashedPin } from '../../actions'
+import type { Session, SessionStorage } from '../../session'
 
-export const setOfflinePin = async (pin: string) => {
-  const { originBuffer } = getSession()
-  const { iv, key } = await createPinAesData(pin)
+/** Stores the Origin Buffer locally, encrypted under the PIN. */
+export const setOfflinePin = async (
+  session: Session,
+  storage: SessionStorage,
+  pin: string,
+) => {
+  const { iv, key } = await createPinAesData(pin, storage)
 
-  localStorage.setItem(
+  storage.setItem(
     LS_KEY_PIN,
-    bufferToBase64(await encrypt(iv, key, originBuffer)),
+    bufferToBase64(await encrypt(iv, key, session.originBuffer())),
   )
 }
 
+/** Publishes the Origin Buffer to the server under a PIN; returns the protector. */
 export const setOnlinePin = async (
+  session: Session,
+  storage: SessionStorage,
   pin: string,
-  dialog: ReturnType<typeof useDialog>,
 ) => {
-  const randomString = generateRandomString()
+  storage.setItem(LS_KEY_RANDOM_STRING, generateRandomString())
 
-  localStorage.setItem(LS_KEY_RANDOM_STRING, randomString)
-
-  const { iv, key } = await createPinAesData(pin)
-  const { keyPairSeed, originBuffer } = getSession()
-  const { publicKey } = getKeyPairFromSeed(keyPairSeed)
+  const { iv, key } = await createPinAesData(pin, storage)
 
   const encryptedOriginBuffer = new Uint8Array(
-    await encrypt(iv, key, originBuffer),
+    await encrypt(iv, key, session.originBuffer()),
   )
 
-  try {
-    const hashedPin = await computeWireHashedPin(pin, publicKey)
+  const publicKey = session.publicKey()
+  const hashedPin = await computeWireHashedPin(pin, publicKey)
 
+  try {
     const protector = await wire.createCredential(
-      keyPairSeed,
+      session.keyPairSeed(),
       hashedPin,
       encryptedOriginBuffer,
     )
 
-    localStorage.setItem(LS_KEY_PUBLIC_KEY, uint8ArrayToBase64(publicKey))
-    localStorage.setItem(LS_KEY_PROTECTOR, uint8ArrayToBase64(protector))
+    storage.setItem(LS_KEY_PUBLIC_KEY, uint8ArrayToBase64(publicKey))
+    storage.setItem(LS_KEY_PROTECTOR, uint8ArrayToBase64(protector))
 
-    return { success: true }
+    return { success: true as const }
   } catch (e) {
     if (isForbidden(e)) {
-      showPublicKeyError(dialog)
-
-      return { success: false, reason: '403' }
+      return { success: false as const, reason: '403' as const }
     }
 
-    throw new Error('Setting online PIN failed')
+    throw e instanceof Error ? e : new Error(String(e))
   }
 }

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { getVault } from '#/core'
 import { NButton, useLoadingBar } from 'naive-ui'
 import { DownloadOutline } from '@vicons/ionicons5'
 
-import { sessionId, areServicesEmpty } from '@/entities/session'
+import { session, sessionId, areServicesEmpty  } from '@/entities/session'
+
 
 const loadingBar = useLoadingBar()
 const linkElement = document.createElement('a')
@@ -12,7 +12,7 @@ const BINARY_MIME_TYPE = 'application/octet-stream'
 const onClick = async () => {
   loadingBar.start()
 
-  const buffer = await getVault().exportBytes()
+  const buffer = await session.vault().exportBytes()
 
   if (!buffer) {
     throw new Error('There is nothing to download')

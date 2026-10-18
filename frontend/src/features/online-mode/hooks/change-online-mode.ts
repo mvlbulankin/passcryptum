@@ -1,18 +1,14 @@
 import { useLoadingBar } from 'naive-ui'
 
 import { isOnlineMode } from '../model'
-import { lsKey, modeVariants } from '../constants'
+import { session } from '@/entities/session'
 
 export const useChangeOnlineMode = () => {
   const loadingBar = useLoadingBar()
 
   const toggleOnlineMode = () => {
     loadingBar.start()
-    localStorage.setItem(
-      lsKey,
-      isOnlineMode.value ? modeVariants.offline : modeVariants.online,
-    )
-    isOnlineMode.value = !isOnlineMode.value
+    session.setMode(isOnlineMode.value ? 'offline' : 'online')
     loadingBar.finish()
   }
 

@@ -2,11 +2,10 @@
 import { ref } from 'vue'
 import { BookOutline, ClipboardOutline } from '@vicons/ionicons5'
 import { NH4, NIcon, NInput, NSpace, useMessage, useLoadingBar } from 'naive-ui'
-import { getVault } from '#/core'
 import { checkForEmptiness } from '#/services'
 
+import { session, importServices, isCalculationInProgress  } from '@/entities/session'
 import { FormSubmit } from '@/shared'
-import { importServices, isCalculationInProgress } from '@/entities/session'
 
 const message = useMessage()
 const servicesString = ref('')
@@ -21,7 +20,7 @@ const onSubmit = async () => {
 
   // The vault accepts both pasted plaintext (a JSON export) and an
   // encrypted blob — one entry point, no format guessing in the caller.
-  const config = await getVault().importText(text)
+  const config = await session.vault().importText(text)
 
   isCalculationInProgress.value = false
 

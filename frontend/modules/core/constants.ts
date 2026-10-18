@@ -19,3 +19,7 @@ export const PASSWORD_BUFFER_BYTE_LENGTH = 64
 export const PASSWORD_BUFFER_ITERATIONS = 2 ** 4
 
 export const WIRE_PIN_ITERATIONS = 600_000
+
+export const LS_KEY_MODE = 'onlineMode'
+
+export const LS_KEY_VISITED = 'isVisited'

@@ -107,69 +107,45 @@ describe('Vault', () => {
     expect((await legacyVault.read()) as unknown[]).toHaveLength(1)
   })
 
-  it('reads a legacy blob even when its first byte happens to be 0x01', async () => {
+  it('dispatches legacy by length, not by the marker byte', async () => {
     const s = shared
+    const { decryptBlob } = await import('../lib/blob')
 
-    // Adversarial case for the marker: a legacy ciphertext starting with
-    // 0x01 must still be read as legacy. Decrypt the first block to find a
-    // plaintext that produces such a ciphertext (CBC: C1 = E(P1 ⊕ IV)).
-    const key = s.cryptoKey
-    const iv = new Uint8Array(s.legacyIv)
+    // A valid legacy blob (raw AES-CBC: length 16k) whose ciphertext happens
+    // to start with the marker byte. Search over the plaintext: CBC gives
+    // C1 = E(P1 ⊕ IV), so varying P1 varies C1.
+    const iv = new Uint8Array(s.legacyIv.slice(0))
 
-    let plaintext: Uint8Array | null = null
+    let legacy: ArrayBuffer | null = null
 
-    for (let candidate = 0; candidate < 512 && !plaintext; candidate++) {
-      const block = new Uint8Array(16)
+    for (let candidate = 0; candidate < 8192 && !legacy; candidate++) {
+      const json = JSON.stringify({ k: candidate })
+      const padded = new Uint8Array(Math.ceil(json.length / 16) * 16)
 
-      block[0] = candidate & 0xff
+      padded.set(new TextEncoder().encode(json))
 
-      // E(block ⊕ IV) is the ciphertext's first block; check its first byte.
-      const probe = await crypto.subtle.encrypt(
+      const cipher = await crypto.subtle.encrypt(
         { name: 'AES-CBC', iv },
-        key,
-        block,
+        s.cryptoKey,
+        padded,
       )
 
-      if (new Uint8Array(probe)[0] === 0x01) {
-        const json = JSON.stringify({ x: [7, {}] })
-
-        plaintext = new Uint8Array(16 + 32)
-        plaintext.set(block, 0)
-        plaintext.set(new TextEncoder().encode(json).slice(0, 32), 16)
+      if (new Uint8Array(cipher)[0] === 0x01 && cipher.byteLength % 16 === 0) {
+        legacy = cipher
       }
     }
 
-    expect(plaintext, 'colliding block found').not.toBeNull()
+    expect(legacy, 'marker-colliding legacy ciphertext found').not.toBeNull()
+    expect(new Uint8Array(legacy!)[0]).toBe(0x01)
+    // The new format is 1 + 16 + 16k; this is 16k, so it cannot be confused.
+    expect(legacy!.byteLength % 16).toBe(0)
 
-    const cipher = await crypto.subtle.encrypt(
-      { name: 'AES-CBC', iv },
-      key,
-      plaintext!.slice(0, 16).buffer,
-    )
+    const plaintext = await decryptBlob(legacy as ArrayBuffer, s.cryptoKey, s.legacyIv)
 
-    // Only the first block matters: 16 bytes, marker collision included.
-    expect(new Uint8Array(cipher)[0]).toBe(0x01)
-    expect(cipher.byteLength % 16).toBe(0)
-
-    storage.setItem(
-      s.lsKey,
-      Array.from(new Uint8Array(cipher))
-        .map(n => n.toString(16).padStart(2, '0'))
-        .join(''),
-    )
-
-    // It decrypts to our 16-byte block, which is not valid Services, so the
-    // read drops it — but it must be *attempted as legacy*, and the length
-    // check is what guarantees that. Prove the dispatch directly:
-    const { decryptBlob } = await import('../lib/blob')
-
-    const raw = await decryptBlob(
-      new Uint8Array(cipher).buffer,
-      s.cryptoKey,
-      s.legacyIv,
-    )
-
-    expect(raw).not.toBeNull()
+    // Decrypted as legacy despite the marker byte: length ruled the new
+    // format out before the marker was consulted.
+    expect(plaintext).not.toBeNull()
+    expect(plaintext?.startsWith('{"k":')).toBe(true)
   })
 
   it('exports bytes that importBytes reads back', async () => {

@@ -1,12 +1,10 @@
-import { exit as exitCoreSession } from '#/core'
+import { createEmptyServices } from '#/services'
 
-import {
-  closeSession,
-  privateSessionId,
-} from '@/entities/session/model/private'
+import { session, privateSessionId, privateServices  } from '@/entities/session/model/private'
 
 // An unattended logged-in tab keeps the master secret material in RAM
-// indefinitely. Log out after a period of no interaction.
+// indefinitely. Log out after a period of no interaction — through the same
+// session.exit() the menu uses, with no UI ceremony.
 export const IDLE_TIMEOUT = 5 * 60 * 1000
 
 const CHECK_INTERVAL = 30 * 1000
@@ -27,8 +25,9 @@ export const watchIdleLogout = () => {
       privateSessionId.value !== null &&
       Date.now() - lastActivity > IDLE_TIMEOUT
     ) {
-      closeSession()
-      exitCoreSession()
+      session.exit()
+      privateSessionId.value = null
+      privateServices.value = createEmptyServices()
     }
   }, CHECK_INTERVAL)
 }

@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { getSession, getKeyPairFromSeed, uint8ArrayToBase64 } from '#/core'
+import { uint8ArrayToBase64 } from '#/core'
 
+import { session } from '@/entities/session/model/private'
 import { CopyButton } from '@/shared'
 import { isCalculationInProgress } from '@/entities/session'
 
-const getPublicKey = () => {
-  const { keyPairSeed } = getSession()
-  const { publicKey } = getKeyPairFromSeed(keyPairSeed)
-
-  return uint8ArrayToBase64(publicKey)
-}
+const getPublicKey = () => uint8ArrayToBase64(session.publicKey())
 </script>
 
 <template>

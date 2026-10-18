@@ -1,6 +1,4 @@
-import { enterWithOriginPassword, enterWithPin } from '#/core'
-
-import { initSession } from '../model/private'
+import { session, initSession  } from '../model/private'
 import { isCalculationInProgress } from '../model/public'
 
 // The flag gates the login form (disabled input + button). It must be
@@ -11,9 +9,9 @@ export const enterByPassword = async (password: string) => {
   isCalculationInProgress.value = true
 
   try {
-    const { id, data } = await enterWithOriginPassword(password)
+    const kit = await session.enter(password)
 
-    initSession(id, data)
+    initSession(kit.id, kit.services)
   } finally {
     isCalculationInProgress.value = false
   }
@@ -23,9 +21,9 @@ export const enterByPin = async (pin: string) => {
   isCalculationInProgress.value = true
 
   try {
-    const { id, data } = await enterWithPin(pin)
+    const kit = await session.enterWithPin(pin)
 
-    initSession(id, data)
+    initSession(kit.id, kit.services)
   } catch (e) {
     void e
 

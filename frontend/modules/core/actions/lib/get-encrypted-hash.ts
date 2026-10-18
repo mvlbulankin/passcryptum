@@ -1,6 +1,7 @@
 import { base64ToUint8Array } from '#/core'
 
 import { wire } from '../../wire'
+import type { SessionStorage } from '../../session/lib/types'
 import { computeWireHashedPin } from './compute-wire-hashed-pin'
 import {
   LS_KEY_PIN,
@@ -11,11 +12,11 @@ import {
 const validateEncryptedHash = (hash: string): boolean =>
   hash.length === 364 && /^[A-Za-z0-9+/=]+$/.test(hash)
 
-export const getEncryptedHash = (): string | null => {
-  const hash = localStorage.getItem(LS_KEY_PIN)
+export const getEncryptedHash = (storage: SessionStorage): string | null => {
+  const hash = storage.getItem(LS_KEY_PIN)
 
   if (!hash || !validateEncryptedHash(hash)) {
-    localStorage.removeItem(LS_KEY_PIN)
+    storage.removeItem(LS_KEY_PIN)
 
     return null
   }
@@ -23,9 +24,12 @@ export const getEncryptedHash = (): string | null => {
   return hash
 }
 
-export const getEncryptedOnlineHash = async (pin: string) => {
-  const publicKey = localStorage.getItem(LS_KEY_PUBLIC_KEY)
-  const protector = localStorage.getItem(LS_KEY_PROTECTOR)
+export const getEncryptedOnlineHash = async (
+  pin: string,
+  storage: SessionStorage,
+) => {
+  const publicKey = storage.getItem(LS_KEY_PUBLIC_KEY)
+  const protector = storage.getItem(LS_KEY_PROTECTOR)
 
   if (!publicKey || !protector) {
     throw new Error('Getting online PIN failed')

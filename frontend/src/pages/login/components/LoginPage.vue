@@ -10,7 +10,6 @@ import {
   useLoadingBar,
   useDialog,
 } from 'naive-ui'
-import { getSession, getKeyPairFromSeed, uint8ArrayToBase64 } from '#/core'
 
 import { createElementRef } from '@/shared'
 import { AppInfo } from '@/widgets/app-info'
@@ -19,7 +18,7 @@ import {
   isOfflinePinSet,
   enterByPin,
   enterByPassword,
-  isCalculationInProgress,
+  isCalculationInProgress, session 
 } from '@/entities/session'
 import { isOnlineMode, useChangeOnlineMode } from '@/features/online-mode'
 import { useDownloadServices } from '@/features/storage/lib/download-services-from-server'
@@ -64,12 +63,7 @@ const onEnterPassword = async (password: string) => {
     await enterByPassword(password)
     loadingBar.finish()
 
-    const { keyPairSeed } = getSession()
-    const { publicKey } = getKeyPairFromSeed(keyPairSeed)
-    const currentPublicKey = uint8ArrayToBase64(publicKey)
-    const storedPublicKey = localStorage.getItem('isVisited')
-
-    if (!storedPublicKey || storedPublicKey !== currentPublicKey) {
+    if (!session.hasVisited()) {
       promptOnlineMode()
     }
   } catch (e) {
@@ -81,11 +75,7 @@ const onEnterPassword = async (password: string) => {
 
 const promptOnlineMode = () => {
   if (isOnlineMode.value) {
-    const { keyPairSeed } = getSession()
-    const { publicKey } = getKeyPairFromSeed(keyPairSeed)
-    const currentPublicKey = uint8ArrayToBase64(publicKey)
-
-    localStorage.setItem('isVisited', currentPublicKey)
+    session.markVisited()
 
     return
   }
@@ -111,18 +101,10 @@ const promptOnlineMode = () => {
         void e
       }
 
-      const { keyPairSeed } = getSession()
-      const { publicKey } = getKeyPairFromSeed(keyPairSeed)
-      const currentPublicKey = uint8ArrayToBase64(publicKey)
-
-      localStorage.setItem('isVisited', currentPublicKey)
+      session.markVisited()
     },
     onNegativeClick() {
-      const { keyPairSeed } = getSession()
-      const { publicKey } = getKeyPairFromSeed(keyPairSeed)
-      const currentPublicKey = uint8ArrayToBase64(publicKey)
-
-      localStorage.setItem('isVisited', currentPublicKey)
+      session.markVisited()
     },
   })
 }

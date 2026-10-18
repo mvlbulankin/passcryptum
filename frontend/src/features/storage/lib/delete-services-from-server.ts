@@ -1,6 +1,7 @@
 import { useDialog, useMessage, useLoadingBar } from 'naive-ui'
-import { getSession, wire, isForbidden  } from '#/core'
+import { wire, isForbidden } from '#/core'
 
+import { session } from '@/entities/session'
 import { showStorageDrawer } from '@/features/storage/model'
 
 import { showPublicKeyError } from './public-key-error'
@@ -14,7 +15,7 @@ export const useDeleteServices = () => {
     loadingBar.start()
 
     try {
-      const { keyPairSeed } = getSession()
+      const keyPairSeed = session.keyPairSeed()
       const result = await wire.clearServices(keyPairSeed)
 
       if (result === 'cleared') {

@@ -12,8 +12,8 @@ import { setOfflinePin } from '#/core'
 import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
 
 import { FormSubmit } from '@/shared'
-import { setOfflinePinState, isCalculationInProgress } from '@/entities/session'
-import { showSetOfflinePinModal } from '../model'
+import { isCalculationInProgress } from '@/entities/session'
+import { session, touchSession, showSetOfflinePinModal  } from '../model'
 
 const pin = ref('')
 
@@ -36,8 +36,8 @@ const onSubmit = () => {
 
   loadingBar.start()
 
-  setOfflinePin(pin.value).then(() => {
-    setOfflinePinState(true)
+  setOfflinePin(session, localStorage, pin.value).then(() => {
+    touchSession()
     message.success('Offline PIN has been set')
     loadingBar.finish()
 

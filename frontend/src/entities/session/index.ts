@@ -6,6 +6,8 @@ export * from './hooks/exit'
 
 export * from './model/public'
 
+export { session } from './model/private'
+
 export { default as ServicesSelect } from './components/ServicesSelect.vue'
 
 export { default as ServicesFilter } from './components/ServicesFilter.vue'

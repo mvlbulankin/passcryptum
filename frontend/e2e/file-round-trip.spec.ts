@@ -29,6 +29,7 @@ test.describe('file export and import', () => {
 
     // Export: the download button hands the browser a file with the vault.
     await openStorage(page1)
+
     const download = page1.waitForEvent('download')
 
     await page1.getByRole('button', { name: 'Download file' }).click()
@@ -39,6 +40,7 @@ test.describe('file export and import', () => {
     expect(path).toBeTruthy()
 
     const exported = await readFile(path as string)
+
     expect(exported.byteLength).toBeGreaterThan(0)
 
     // Device 2: empty storage, same origin password (same keys).

@@ -1,8 +1,4 @@
-import { useDialog } from 'naive-ui'
-import { base64ToUint8Array } from '#/core'
-
-import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
-
+import { base64ToUint8Array } from '../../shared'
 import { wire, isForbidden } from '../../wire'
 import {
   LS_KEY_PIN,
@@ -10,12 +6,15 @@ import {
   LS_KEY_PUBLIC_KEY,
   LS_KEY_RANDOM_STRING,
 } from '../../constants'
+import type { SessionStorage } from '../../session'
 
-export const deleteOfflinePin = () => localStorage.removeItem(LS_KEY_PIN)
+export const deleteOfflinePin = (storage: SessionStorage) =>
+  storage.removeItem(LS_KEY_PIN)
 
-export const deleteOnlinePin = async (dialog: ReturnType<typeof useDialog>) => {
-  const publicKey = localStorage.getItem(LS_KEY_PUBLIC_KEY)
-  const protector = localStorage.getItem(LS_KEY_PROTECTOR)
+/** Revokes this device's credential; true when the server confirmed. */
+export const deleteOnlinePin = async (storage: SessionStorage) => {
+  const publicKey = storage.getItem(LS_KEY_PUBLIC_KEY)
+  const protector = storage.getItem(LS_KEY_PROTECTOR)
 
   if (!publicKey || !protector) {
     throw new Error('Deleting online PIN failed')
@@ -28,13 +27,15 @@ export const deleteOnlinePin = async (dialog: ReturnType<typeof useDialog>) => {
     )
   } catch (e) {
     if (isForbidden(e)) {
-      showPublicKeyError(dialog)
+      return false
     }
 
     throw new Error('Deleting online PIN failed')
   }
 
-  localStorage.removeItem(LS_KEY_PROTECTOR)
-  localStorage.removeItem(LS_KEY_PUBLIC_KEY)
-  localStorage.removeItem(LS_KEY_RANDOM_STRING)
+  storage.removeItem(LS_KEY_PROTECTOR)
+  storage.removeItem(LS_KEY_PUBLIC_KEY)
+  storage.removeItem(LS_KEY_RANDOM_STRING)
+
+  return true
 }

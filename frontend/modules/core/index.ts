@@ -32,10 +32,13 @@ export {
   isThereOfflinePin,
 } from './pin'
 
-export {
-  exit,
-  getSession,
-  getVault,
-  enterWithPin,
-  enterWithOriginPassword,
+export { createSession, SessionClosedError } from './session'
+
+export type {
+  Session,
+  SessionDeps,
+  SessionMode,
+  SessionStorage,
+  StarterKit,
+  TransportKeys,
 } from './session'

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { stringify } from '#/services'
-import { getVault } from '#/core'
+
+import { session } from '@/entities/session'
 
 import AbstractCopyServices from './AbstractCopyServices.vue'
 
 const getDecryptedText = async () => {
-  const services = await getVault().read()
+  const services = await session.vault().read()
 
   return services ? stringify(services) : null
 }

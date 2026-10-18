@@ -1,8 +1,8 @@
 import { useLoadingBar } from 'naive-ui'
-import { exit as exitCoreSession } from '#/core'
+import { createEmptyServices } from '#/services'
 
 import { DROPDOWN_TIMEOUT } from '@/shared'
-import { closeSession } from '../model/private'
+import { session, privateSessionId, privateServices } from '../model/private'
 
 export const useExit = () => {
   const loadingBar = useLoadingBar()
@@ -12,10 +12,11 @@ export const useExit = () => {
       loadingBar.start()
 
       setTimeout(() => {
-        closeSession()
-        // The UI previously only cleared reactive state; the core
-        // session (zeroized buffers) was never dropped on "exit".
-        exitCoreSession()
+        // One path: the session closes itself (zeroizing what it owns and
+        // closing the vault); the reactive projections follow.
+        session.exit()
+        privateSessionId.value = null
+        privateServices.value = createEmptyServices()
         loadingBar.finish()
       }, DROPDOWN_TIMEOUT)
     },
