@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, h  } from 'vue'
+import { ref, watch, nextTick, h } from 'vue'
 import {
   NCard,
   NTabs,
@@ -18,7 +18,8 @@ import {
   isOfflinePinSet,
   enterByPin,
   enterByPassword,
-  isCalculationInProgress, session 
+  isCalculationInProgress,
+  session,
 } from '@/entities/session'
 import { isOnlineMode, useChangeOnlineMode } from '@/features/online-mode'
 import { useDownloadServices } from '@/features/storage/lib/download-services-from-server'

@@ -60,7 +60,10 @@ export const createVault = (
   const write = async (services: ServicesConfig): Promise<void> => {
     assertOpen()
 
-    const blob = await encryptBlob(stringifyServices(services), session.cryptoKey)
+    const blob = await encryptBlob(
+      stringifyServices(services),
+      session.cryptoKey,
+    )
 
     storage.setItem(session.lsKey, toHex(blob))
   }

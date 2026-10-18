@@ -140,7 +140,11 @@ describe('Vault', () => {
     // The new format is 1 + 16 + 16k; this is 16k, so it cannot be confused.
     expect(legacy!.byteLength % 16).toBe(0)
 
-    const plaintext = await decryptBlob(legacy as ArrayBuffer, s.cryptoKey, s.legacyIv)
+    const plaintext = await decryptBlob(
+      legacy as ArrayBuffer,
+      s.cryptoKey,
+      s.legacyIv,
+    )
 
     // Decrypted as legacy despite the marker byte: length ruled the new
     // format out before the marker was consulted.

@@ -11,15 +11,15 @@ application actually uses; everything else is an implementation detail, and
 
 ## What is here
 
-| Module | Owns |
-|---|---|
-| `session/` | who is logged in: the derived keys, the vault instance, the online/offline mode, PIN availability |
-| `vault/` | Services as stored on the device: one encrypted blob, its format, export to a file and import back |
-| `wire/` | the Wire Protocol client — the only way the app talks to the server |
-| `pin/` | storing and releasing the Origin Buffer under a PIN |
-| `generator/` | service password derivation from Entropy |
-| `actions/`, `shared/` | PIN-derived AES material and crypto/encoding primitives |
-| `constants.ts` | protocol and storage constants (iterations, key names, minimum PIN length) |
+| Module                | Owns                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `session/`            | who is logged in: the derived keys, the vault instance, the online/offline mode, PIN availability  |
+| `vault/`              | Services as stored on the device: one encrypted blob, its format, export to a file and import back |
+| `wire/`               | the Wire Protocol client — the only way the app talks to the server                                |
+| `pin/`                | storing and releasing the Origin Buffer under a PIN                                                |
+| `generator/`          | service password derivation from Entropy                                                           |
+| `actions/`, `shared/` | PIN-derived AES material and crypto/encoding primitives                                            |
+| `constants.ts`        | protocol and storage constants (iterations, key names, minimum PIN length)                         |
 
 ## Logging in and out
 

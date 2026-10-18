@@ -19,7 +19,11 @@ import {
   LS_KEY_MODE,
   LS_KEY_VISITED,
 } from '../../constants'
-import { getEncryptedHash, getEncryptedOnlineHash, createPinAesData } from '../../actions'
+import {
+  getEncryptedHash,
+  getEncryptedOnlineHash,
+  createPinAesData,
+} from '../../actions'
 import { parseOriginBuffer } from './origin-buffer'
 import { SessionClosedError } from './types'
 import type {
@@ -157,8 +161,8 @@ export const createSession = (deps: SessionDeps = {}): Session => {
   const isOnlinePinSet = () =>
     Boolean(
       storage.getItem(LS_KEY_PUBLIC_KEY) &&
-        storage.getItem(LS_KEY_PROTECTOR) &&
-        storage.getItem(LS_KEY_RANDOM_STRING),
+      storage.getItem(LS_KEY_PROTECTOR) &&
+      storage.getItem(LS_KEY_RANDOM_STRING),
     )
 
   const isOfflinePinSet = () => Boolean(getEncryptedHash(storage))

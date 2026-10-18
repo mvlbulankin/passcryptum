@@ -1,4 +1,4 @@
-import { session, initSession  } from '../model/private'
+import { session, initSession } from '../model/private'
 import { isCalculationInProgress } from '../model/public'
 
 // The flag gates the login form (disabled input + button). It must be

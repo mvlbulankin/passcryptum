@@ -1,4 +1,7 @@
-import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript'
+import {
+  defineConfigWithVueTs,
+  vueTsConfigs,
+} from '@vue/eslint-config-typescript'
 import skipFormatting from '@vue/eslint-config-prettier/skip-formatting'
 import pluginVue from 'eslint-plugin-vue'
 import importX from 'eslint-plugin-import-x'
@@ -33,7 +36,7 @@ export default defineConfigWithVueTs(
       'import-x/order': [
         'error',
         {
-          pathGroups: [
+          'pathGroups': [
             {
               pattern: '#/**',
               group: 'external',
@@ -92,7 +95,7 @@ export default defineConfigWithVueTs(
     rules: {
       'prefer-const': 'error',
       'no-else-return': 'error',
-      camelcase: 'error',
+      'camelcase': 'error',
       'no-return-assign': 'error',
       'prefer-destructuring': [
         'error',
@@ -101,7 +104,7 @@ export default defineConfigWithVueTs(
           array: false,
         },
       ],
-      curly: ['error', 'all'],
+      'curly': ['error', 'all'],
       'no-unused-expressions': 'error',
       'object-shorthand': [
         'error',
@@ -144,7 +147,11 @@ export default defineConfigWithVueTs(
         { blankLine: 'always', prev: '*', next: 'singleline-const' },
         { blankLine: 'always', prev: '*', next: 'singleline-let' },
         { blankLine: 'any', prev: 'singleline-let', next: 'singleline-let' },
-        { blankLine: 'any', prev: 'singleline-const', next: 'singleline-const' },
+        {
+          blankLine: 'any',
+          prev: 'singleline-const',
+          next: 'singleline-const',
+        },
       ],
 
       'vue/html-self-closing': [

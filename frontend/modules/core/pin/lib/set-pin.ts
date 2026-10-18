@@ -1,6 +1,8 @@
 import {
   bufferToBase64,
-  uint8ArrayToBase64, encrypt, generateRandomString 
+  uint8ArrayToBase64,
+  encrypt,
+  generateRandomString,
 } from '../../shared'
 import { wire, isForbidden } from '../../wire'
 import {

@@ -2,8 +2,7 @@
 import { NButton, useLoadingBar } from 'naive-ui'
 import { DownloadOutline } from '@vicons/ionicons5'
 
-import { session, sessionId, areServicesEmpty  } from '@/entities/session'
-
+import { session, sessionId, areServicesEmpty } from '@/entities/session'
 
 const loadingBar = useLoadingBar()
 const linkElement = document.createElement('a')

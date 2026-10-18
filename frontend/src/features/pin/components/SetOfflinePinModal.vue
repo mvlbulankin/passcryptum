@@ -13,7 +13,7 @@ import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
 
 import { FormSubmit } from '@/shared'
 import { isCalculationInProgress } from '@/entities/session'
-import { session, touchSession, showSetOfflinePinModal  } from '../model'
+import { session, touchSession, showSetOfflinePinModal } from '../model'
 
 const pin = ref('')
 

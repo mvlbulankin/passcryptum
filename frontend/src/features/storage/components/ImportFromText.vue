@@ -4,7 +4,11 @@ import { BookOutline, ClipboardOutline } from '@vicons/ionicons5'
 import { NH4, NIcon, NInput, NSpace, useMessage, useLoadingBar } from 'naive-ui'
 import { checkForEmptiness } from '#/services'
 
-import { session, importServices, isCalculationInProgress  } from '@/entities/session'
+import {
+  session,
+  importServices,
+  isCalculationInProgress,
+} from '@/entities/session'
 import { FormSubmit } from '@/shared'
 
 const message = useMessage()

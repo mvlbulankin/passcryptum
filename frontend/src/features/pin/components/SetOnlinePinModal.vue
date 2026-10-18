@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { useDialog,
+import {
+  useDialog,
   NIcon,
   NModal,
   NSpace,
   NInput,
   useMessage,
-  useLoadingBar } from 'naive-ui'
+  useLoadingBar,
+} from 'naive-ui'
 import { ref } from 'vue'
 import { MIN_PIN_LENGTH, isForbidden, setOnlinePin } from '#/core'
 import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
@@ -13,7 +15,7 @@ import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
 import { FormSubmit } from '@/shared'
 import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
 import { isCalculationInProgress } from '@/entities/session'
-import { session, touchSession, showSetOnlinePinModal  } from '../model'
+import { session, touchSession, showSetOnlinePinModal } from '../model'
 
 const pin = ref('')
 

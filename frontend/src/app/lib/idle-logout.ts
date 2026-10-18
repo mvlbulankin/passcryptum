@@ -1,6 +1,10 @@
 import { createEmptyServices } from '#/services'
 
-import { session, privateSessionId, privateServices  } from '@/entities/session/model/private'
+import {
+  session,
+  privateSessionId,
+  privateServices,
+} from '@/entities/session/model/private'
 
 // An unattended logged-in tab keeps the master secret material in RAM
 // indefinitely. Log out after a period of no interaction — through the same

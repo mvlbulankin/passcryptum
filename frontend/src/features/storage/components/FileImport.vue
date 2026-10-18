@@ -3,8 +3,7 @@ import { DocumentOutline } from '@vicons/ionicons5'
 import { NH4, NButton, useMessage, useLoadingBar } from 'naive-ui'
 import { checkForEmptiness } from '#/services'
 
-import { session, importServices  } from '@/entities/session'
-
+import { session, importServices } from '@/entities/session'
 
 const message = useMessage()
 const loadingBar = useLoadingBar()

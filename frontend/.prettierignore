@@ -1,0 +1,10 @@
+# Prettier runs over the whole frontend (`prettier . --ignore-path .gitignore`),
+# so it also walks whatever the tests left behind. Those trees are already in
+# the repo .gitignore; listing them here keeps `npm run format` from failing on
+# output it cannot write (playwright writes test-results/ as another user when
+# the suite runs in its container).
+node_modules/
+dist/
+test-results/
+playwright-report/
+coverage/

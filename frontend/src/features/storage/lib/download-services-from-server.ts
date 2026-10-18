@@ -2,7 +2,7 @@ import { useDialog, useMessage, useLoadingBar } from 'naive-ui'
 import { decryptData, isForbidden, wire } from '#/core'
 import { checkForEmptiness } from '#/services'
 
-import { session, importServices  } from '@/entities/session'
+import { session, importServices } from '@/entities/session'
 import { showStorageDrawer } from '@/features/storage/model'
 
 import { showPublicKeyError } from './public-key-error'
@@ -33,9 +33,9 @@ export const useDownloadServices = () => {
         throw new Error('Failed to decrypt data')
       }
 
-      const config = await session.vault().importBytes(
-        new Uint8Array(bytes).buffer,
-      )
+      const config = await session
+        .vault()
+        .importBytes(new Uint8Array(bytes).buffer)
 
       if (!config || checkForEmptiness(config)) {
         throw new Error('Downloaded vault is empty')

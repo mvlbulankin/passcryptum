@@ -11,7 +11,10 @@ import type { SessionStorage } from '../../session/lib/types'
  * the PIN and the per-install random string. Takes the storage explicitly:
  * the session owns persistence, this helper must not reach for a global.
  */
-export const createPinAesData = async (pin: string, storage: SessionStorage) => {
+export const createPinAesData = async (
+  pin: string,
+  storage: SessionStorage,
+) => {
   const random = storage.getItem(LS_KEY_RANDOM_STRING) ?? ''
 
   const buffer = await pbkdf2(

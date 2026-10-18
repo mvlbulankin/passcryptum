@@ -43,7 +43,10 @@ const signedBody = (
 
   const signature = createSignature(
     concatUint8Arrays(
-      concatUint8Arrays(methodBytes(method), concatUint8Arrays(timestamp, nonce)),
+      concatUint8Arrays(
+        methodBytes(method),
+        concatUint8Arrays(timestamp, nonce),
+      ),
       payload,
     ),
     secretKey,
@@ -131,7 +134,10 @@ export const createWireClient = (transport: Transport): WireClient => {
     throw forbiddenOrUnexpected(status)
   }
 
-  const setServices = async (keyPairSeed: Uint8Array, encrypted: Uint8Array) => {
+  const setServices = async (
+    keyPairSeed: Uint8Array,
+    encrypted: Uint8Array,
+  ) => {
     const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
     const nonce = generateNonce()
 

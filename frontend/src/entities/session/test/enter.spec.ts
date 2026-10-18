@@ -16,7 +16,10 @@ vi.mock('../model/private', () => ({
     subscribe: () => () => undefined,
     isOnlinePinSet: () => false,
     isOfflinePinSet: () => false,
-    vault: () => ({ write: () => Promise.resolve(), clear: () => Promise.resolve() }),
+    vault: () => ({
+      write: () => Promise.resolve(),
+      clear: () => Promise.resolve(),
+    }),
   },
   initSession: (...a: unknown[]) => initSession(...a),
 }))

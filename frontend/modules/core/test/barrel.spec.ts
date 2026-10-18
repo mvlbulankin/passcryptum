@@ -30,9 +30,9 @@ const read = (file: string) => readFileSync(file, 'utf-8')
 const barrelExports = (): Set<string> => {
   const source = read(join(CORE, 'index.ts'))
 
-  const names = [...source.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)].flatMap(
-    match => match[1].split(','),
-  )
+  const names = [
+    ...source.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g),
+  ].flatMap(match => match[1].split(','))
 
   return new Set(
     names

@@ -8,7 +8,11 @@ import {
   clearSelectedService,
 } from '@/entities/session'
 import { CredentialsModal } from '@/features/credentials'
-import { showServiceDetails, AddLoginModal, ServiceDetails  } from '@/features/service-details'
+import {
+  showServiceDetails,
+  AddLoginModal,
+  ServiceDetails,
+} from '@/features/service-details'
 import { useServiceView } from '../hooks/service-view'
 
 const { onCopyLogin, onCopyPassword, loginJustCopied, passwordJustCopied } =

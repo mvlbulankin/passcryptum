@@ -9,13 +9,20 @@ import { WIRE_PIN_ITERATIONS } from '../../constants'
 // credential (session active) and when authenticating (localStorage) — the
 // protector, the glossary's first-choice salt, does not exist yet at
 // creation time.
-export const computeWireHashedPin = async (pin: string, publicKey: Uint8Array) => {
+export const computeWireHashedPin = async (
+  pin: string,
+  publicKey: Uint8Array,
+) => {
   const pinHash = new Uint8Array(await getHashOfString(pin))
   const salt = new Uint8Array(publicKey)
 
-  const key = await crypto.subtle.importKey('raw', pinHash.buffer, 'PBKDF2', false, [
-    'deriveBits',
-  ])
+  const key = await crypto.subtle.importKey(
+    'raw',
+    pinHash.buffer,
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  )
 
   const bits = await crypto.subtle.deriveBits(
     {

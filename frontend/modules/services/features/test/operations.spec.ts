@@ -147,9 +147,9 @@ describe('updateVersionOfLogin', () => {
   it('throws for a missing login and leaves versions alone', () => {
     const config = fixture()
 
-    expect(() => updateVersionOfLogin(config, 'github.com', 'ghost', 7)).toThrow(
-      'The login "ghost" does not exist',
-    )
+    expect(() =>
+      updateVersionOfLogin(config, 'github.com', 'ghost', 7),
+    ).toThrow('The login "ghost" does not exist')
     expect(config[0].logins[0].version).toBe(1)
   })
 })
@@ -169,9 +169,9 @@ describe('updateServicePreferences', () => {
   it('rejects an out-of-range length index before touching the config', () => {
     const config = fixture()
 
-    expect(() => updateServicePreferences(config, 'github.com', 9, true)).toThrow(
-      'Invalid password length index',
-    )
+    expect(() =>
+      updateServicePreferences(config, 'github.com', 9, true),
+    ).toThrow('Invalid password length index')
     expect(config[0].passwordLengthIndex).toBe(2)
   })
 

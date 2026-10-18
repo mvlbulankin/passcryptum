@@ -2,7 +2,11 @@
 // from here (the core barrel re-exports what it needs). Wire framing helpers
 // live in wire/lib/protocol.ts, not here.
 
-export { getBufferOfText, getTextFromBuffer, parseHexToBuffer } from './lib/text'
+export {
+  getBufferOfText,
+  getTextFromBuffer,
+  parseHexToBuffer,
+} from './lib/text'
 
 export { concatBuffers, stringifyBuffer } from './lib/buffer'
 
