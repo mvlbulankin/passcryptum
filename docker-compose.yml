@@ -1,0 +1,33 @@
+# Passcryptum: two containers (ADR-0003) — Go binary (API + embedded SPA +
+# SQLite) behind Caddy (automatic TLS for the ddns domain, security headers).
+#
+# Build from the repo root:
+#   docker build -f backend/Dockerfile -t passcryptum-go .
+# Onboard a key (generate one with: docker compose run --rm backend genkey):
+#   docker compose run --rm backend add-public-key <b64pub>
+#
+# Before starting, set your domain in gateway/Caddyfile (Caddy gets the
+# certificate itself — no certbot).
+
+services:
+  backend:
+    image: passcryptum-go
+    volumes:
+      - pc_data:/data
+
+  gateway:
+    image: caddy:2
+    volumes:
+      - ./gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "443:443"
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pc_data:
+  caddy_data:
+  caddy_config:

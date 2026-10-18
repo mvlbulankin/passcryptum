@@ -1,0 +1,25 @@
+# Caddyfile — production template (ADR-0003, gateway).
+# Caddy handles the whole TLS lifecycle for the ddns domain automatically:
+# obtains (Let's Encrypt, ZeroSSL fallback), renews, redirects HTTP->HTTPS.
+# No certbot, no cert paths, survives IP changes as long as DNS follows.
+#
+# EDIT the domain below to your real one.
+
+passcryptum.ddns.net {
+	# Security headers (HSTS is added by Caddy automatically on https)
+	request_body {
+		max_size 1048576
+	}
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+	}
+
+	encode zstd gzip
+
+	reverse_proxy backend:8000
+}
+
