@@ -171,3 +171,6 @@ passcryptum.db
 
 # build output the e2e stack embeds into backend/web
 backend/web/
+
+# coverage output
+frontend/coverage/

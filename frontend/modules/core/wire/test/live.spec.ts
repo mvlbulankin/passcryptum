@@ -10,6 +10,9 @@ import { createWireClient } from '../index'
 //
 // Opt-in: set PC_BASE_URL (and PC_PRIVATE_SEED, PC_PUBLIC_KEY of an onboarded
 // profile) to run. Skipped otherwise, like the Go contract suite.
+//
+// @vitest-environment node — node's fetch has no CORS: the suite talks to the
+// stack cross-origin on purpose (the browser would be blocked).
 const base = process.env.PC_BASE_URL
 const seedB64 = process.env.PC_PRIVATE_SEED
 const pubB64 = process.env.PC_PUBLIC_KEY

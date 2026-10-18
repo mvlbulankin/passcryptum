@@ -45,6 +45,7 @@ const main = async () => {
     spawnSyncOrThrow(bin, args, backendDir, env)
 
   const keys = run(['genkey'])
+  const seed = keys.match(/seed\(private\):\s+(\S+)/)?.[1] as string
   const publicKey = keys.match(/public:\s+(\S+)/)?.[1] as string
 
   run(['add-public-key', publicKey])
@@ -88,7 +89,14 @@ const main = async () => {
   }
 
   // Print the pid so the caller can tear the server down.
-  process.stdout.write(`E2E_SERVER_PID=${server.pid}\nE2E_WORKDIR=${workDir}\n`)
+  // The seed/public pair lets the live wire suite sign requests as this
+  // profile (it is onboarded above).
+  process.stdout.write(
+    `E2E_SERVER_PID=${server.pid}\n` +
+      `E2E_WORKDIR=${workDir}\n` +
+      `E2E_SEED=${seed}\n` +
+      `E2E_PUB=${publicKey}\n`,
+  )
 }
 
 function spawnSyncOrThrow(

@@ -53,6 +53,8 @@ STACK_RUNNER=$!
 for _ in $(seq 1 240); do
   STACK_PID="$(sed -n 's/^E2E_SERVER_PID=//p' "$STACK_LOG" | head -1)"
   WORKDIR="$(sed -n 's/^E2E_WORKDIR=//p' "$STACK_LOG" | head -1)"
+  E2E_SEED="$(sed -n 's/^E2E_SEED=//p' "$STACK_LOG" | head -1)"
+  E2E_PUB="$(sed -n 's/^E2E_PUB=//p' "$STACK_LOG" | head -1)"
   [[ -n "$STACK_PID" ]] && break
   sleep 0.5
 done
@@ -90,6 +92,18 @@ for _ in $(seq 1 60); do
     -sk --max-time 2 -o /dev/null "https://$CADDY_NAME:$TLS_PORT/manifest.json" && break
   sleep 0.5
 done
+
+echo "== live wire suite (TS client against the running stack) =="
+docker run --rm \
+  --network "$NET" \
+  -v "$ROOT:/work" \
+  -e HOME=/tmp \
+  -e PC_BASE_URL="http://$HOST_ADDR:$PORT" \
+  -e PC_PRIVATE_SEED="$E2E_SEED" \
+  -e PC_PUBLIC_KEY="$E2E_PUB" \
+  -w /work/frontend \
+  "$IMAGE" \
+  sh -c 'cd /work/frontend && ./node_modules/.bin/vitest run modules/core/wire/test/live.spec.ts'
 
 echo "== browser (Playwright container) =="
 docker run --rm \
