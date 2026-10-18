@@ -47,9 +47,6 @@ type server struct {
 	st  *store.Store
 	g   *guard.Guard
 	now func() time.Time
-
-	// deny writes 403 and the audit line; every denial goes through it.
-	deny func(w http.ResponseWriter, r *http.Request, pub, why string)
 }
 
 func serve(st *store.Store, g *guard.Guard, addr string) error {
@@ -134,7 +131,9 @@ type endpoint func(auth *wire.Auth) (answer, *wire.Error)
 
 // handle runs one endpoint: parse and verify the request, enforce the
 // recipe's profile requirement, run the domain function, and write exactly
-// one response. It is the only place that emits 403 or the audit line.
+// one response. Domain denials (403) go through writeDenied here; the wire
+// pipeline's own denials (replay) come back as an error and are written by
+// writeWireError.
 func (s *server) handle(
 	w http.ResponseWriter,
 	r *http.Request,

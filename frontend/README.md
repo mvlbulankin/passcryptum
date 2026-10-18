@@ -26,7 +26,7 @@ Feature-Sliced layout:
 
 - `modules/` — reusable, UI-framework-light layers:
   - `modules/core/` — all cryptography: session (origin buffer), PIN
-    handling, data (encrypted local storage), **wire/** — the Wire
+    handling, vault (the encrypted local blob), **wire/** — the Wire
     Protocol client, the only place the app talks to the server;
   - `modules/services/` — pure functions over the services config
     (parse/stringify/merge).

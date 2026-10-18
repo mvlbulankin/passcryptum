@@ -40,8 +40,9 @@ Two containers, one binary. The wire protocol between the SPA and the
 backend is a versioned public contract pinned by contract tests
 ([backend/contract](backend/contract/README.md)).
 
-**Versioning note:** protocol versions (`Protocol-Version: v1/v2`) are
-independent of product versions (2.x → 3.x).
+**Versioning note:** the protocol is versioned by the `Protocol-Version`
+header (`2` today; requests without it get the v1 behaviour). Protocol
+versions are independent of product versions (2.x → 3.x).
 
 ## Documentation
 
@@ -53,8 +54,9 @@ independent of product versions (2.x → 3.x).
 
 ## Deploy
 
-1. Any server with Docker. Synced clock is mandatory (the protocol checks
-   unix timestamps, ±300 s tolerance).
+1. Any server with Docker. Synced clock is mandatory: requests carry a unix
+   timestamp and the server enforces a 300 s window (one-sided in protocol
+   v2 — a timestamp from the future is rejected).
 2. Put your domain into `gateway/Caddyfile` — Caddy obtains and renews the
    certificate automatically (no certbot).
 3. Build and run:

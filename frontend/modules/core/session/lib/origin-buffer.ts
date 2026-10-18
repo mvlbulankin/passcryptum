@@ -1,5 +1,3 @@
-import { sign } from 'tweetnacl'
-
 import { capitals, formatPassword, stringifyBuffer } from '../../shared'
 
 // The Origin Buffer layout. One place, so the app and anything mirroring it
@@ -30,10 +28,3 @@ export const parseOriginBuffer = (buffer: ArrayBuffer) => ({
   ),
   cryptoKeyBuffer: buffer.slice(SECRET_BOX_KEY_RANGE[1]),
 })
-
-/** The Ed25519 key pair derived from the Origin Buffer's seed slice. */
-export const deriveKeyPair = (keyPairSeed: Uint8Array) => {
-  const { secretKey, publicKey } = sign.keyPair.fromSeed(keyPairSeed)
-
-  return { secretKey, publicKey }
-}

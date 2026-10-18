@@ -1,7 +1,7 @@
 export type WireErrorKind =
-  | 'forbidden' // 403: profile not onboarded (or credential auth failed)
+  | 'forbidden' // 403: profile not onboarded, credential auth failed, replay
   | 'network' // transport refused / network failure
-  | 'unexpectedStatus' // anything the v1 contract does not define for the endpoint
+  | 'unexpectedStatus' // a status the contract does not define for the endpoint
   | 'malformedResponse' // body is not the JSON-encoded string the protocol promises
 
 export class WireError extends Error {
@@ -14,7 +14,7 @@ export class WireError extends Error {
   }
 }
 
-// 403 is the protocol's only defined failure; callers translate it to the
+// 403 is the contract's only defined failure; callers translate it to the
 // "public key not onboarded" dialog. One helper instead of N catch cascades.
 export const isForbidden = (e: unknown): e is WireError =>
   e instanceof WireError && e.kind === 'forbidden'

@@ -7,7 +7,7 @@ import { useDialog,
   useMessage,
   useLoadingBar } from 'naive-ui'
 import { ref } from 'vue'
-import { isForbidden, setOnlinePin } from '#/core'
+import { MIN_PIN_LENGTH, isForbidden, setOnlinePin } from '#/core'
 import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
 
 import { FormSubmit } from '@/shared'
@@ -17,9 +17,6 @@ import { session, touchSession, showSetOnlinePinModal  } from '../model'
 
 const pin = ref('')
 
-// The client enforces a minimum PIN length to bound the dictionary space
-// the KDF has to defend (ADR-0003).
-const MIN_PIN_LENGTH = 8
 const dialog = useDialog()
 const message = useMessage()
 const loadingBar = useLoadingBar()

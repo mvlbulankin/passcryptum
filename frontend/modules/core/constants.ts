@@ -20,6 +20,10 @@ export const PASSWORD_BUFFER_ITERATIONS = 2 ** 4
 
 export const WIRE_PIN_ITERATIONS = 600_000
 
+// ADR-0003 §5: the client enforces a minimum PIN length to bound the
+// dictionary space the KDF has to defend.
+export const MIN_PIN_LENGTH = 8
+
 export const LS_KEY_MODE = 'onlineMode'
 
 export const LS_KEY_VISITED = 'isVisited'

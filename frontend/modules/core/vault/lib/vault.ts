@@ -1,5 +1,5 @@
-import type { ServicesConfig } from '../../../services/types'
-import { parse } from '../../../services/features/lib/parse'
+import type { ServicesConfig } from '../../../services'
+import { parse } from '../../../services'
 
 import {
   fromHex,

@@ -84,28 +84,40 @@ const parseJsonStringBody = (body: string): Uint8Array => {
   }
 }
 
+/**
+ * The signed header set for the header-authenticated endpoints (GET/DELETE on
+ * profiles): public key, timestamp, nonce and a signature over
+ * method ‖ timestamp ‖ nonce.
+ */
+const signedHeaders = (
+  method: 'GET' | 'DELETE',
+  keyPairSeed: Uint8Array,
+): Record<string, string> => {
+  const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
+  const timestamp = generateTimestamp()
+  const nonce = generateNonce()
+
+  const signature = createSignature(
+    headerMessage(method, timestamp, nonce),
+    secretKey,
+  )
+
+  return {
+    ...versionHeaders,
+    'Content-Type': 'application/json',
+    'Public-Key': uint8ArrayToBase64(publicKey),
+    'Timestamp': uint8ArrayToBase64(timestamp),
+    'Nonce': uint8ArrayToBase64(nonce),
+    'Signature': uint8ArrayToBase64(signature),
+  }
+}
+
 export const createWireClient = (transport: Transport): WireClient => {
   const getServices = async (keyPairSeed: Uint8Array) => {
-    const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
-    const timestamp = generateTimestamp()
-    const nonce = generateNonce()
-
-    const signature = createSignature(
-      headerMessage('GET', timestamp, nonce),
-      secretKey,
-    )
-
     const { status, body } = await send(transport, {
       method: 'GET',
       url: profilesUrl(),
-      headers: {
-        ...versionHeaders,
-        'Content-Type': 'application/json',
-        'Public-Key': uint8ArrayToBase64(publicKey),
-        'Timestamp': uint8ArrayToBase64(timestamp),
-        'Nonce': uint8ArrayToBase64(nonce),
-        'Signature': uint8ArrayToBase64(signature),
-      },
+      headers: signedHeaders('GET', keyPairSeed),
     })
 
     if (status === 200) {
@@ -143,26 +155,10 @@ export const createWireClient = (transport: Transport): WireClient => {
   const clearServices = async (
     keyPairSeed: Uint8Array,
   ): Promise<'cleared' | 'already-empty'> => {
-    const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
-    const timestamp = generateTimestamp()
-    const nonce = generateNonce()
-
-    const signature = createSignature(
-      headerMessage('DELETE', timestamp, nonce),
-      secretKey,
-    )
-
     const { status } = await send(transport, {
       method: 'DELETE',
       url: profilesUrl(),
-      headers: {
-        ...versionHeaders,
-        'Content-Type': 'application/json',
-        'Public-Key': uint8ArrayToBase64(publicKey),
-        'Timestamp': uint8ArrayToBase64(timestamp),
-        'Nonce': uint8ArrayToBase64(nonce),
-        'Signature': uint8ArrayToBase64(signature),
-      },
+      headers: signedHeaders('DELETE', keyPairSeed),
     })
 
     if (status === 200) {

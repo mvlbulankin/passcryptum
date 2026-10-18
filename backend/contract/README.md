@@ -1,8 +1,8 @@
 # Contract tests (ADR-0002)
 
 Wire-protocol v1 contract tests. They pin what ANY backend must do:
-status codes, success bodies, and the documented quirks (symmetric ±300s
-timestamp window, unsigned credential GET/DELETE, 10-credential eviction,
+status codes, success bodies, and the documented v1 quirks (symmetric
+±300 s timestamp window, unsigned credential GET/DELETE, 10-credential eviction,
 services overwrite without versioning).
 
 This suite is the contract itself.

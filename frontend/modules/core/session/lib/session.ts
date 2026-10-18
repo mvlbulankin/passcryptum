@@ -1,4 +1,4 @@
-import { stringify } from '../../../services/features/lib/stringify'
+import { stringify } from '../../../services'
 
 import { createVault, type Vault } from '../../vault'
 import {
@@ -7,7 +7,7 @@ import {
   decrypt,
   getBufferOfText,
   pbkdf2,
-  uint8ArrayToBase64,
+  uint8ArrayToBase64, getKeyPairFromSeed 
 } from '../../shared'
 import {
   ORIGIN_BUFFER_BYTE_LENGTH,
@@ -19,7 +19,7 @@ import {
   LS_KEY_VISITED,
 } from '../../constants'
 import { getEncryptedHash, getEncryptedOnlineHash, createPinAesData } from '../../actions'
-import { deriveKeyPair, parseOriginBuffer } from './origin-buffer'
+import { parseOriginBuffer } from './origin-buffer'
 import { SessionClosedError } from './types'
 import type {
   Session,
@@ -173,7 +173,7 @@ export const createSession = (deps: SessionDeps = {}): Session => {
       return () => void listeners.delete(listener)
     },
     profileId: () => active().profileId,
-    publicKey: () => deriveKeyPair(active().keyPairSeed).publicKey,
+    publicKey: () => getKeyPairFromSeed(active().keyPairSeed).publicKey,
     keyPairSeed: () => active().keyPairSeed,
     entropy: () => new Uint8Array(active().entropy),
     originBuffer: () => active().originBuffer,
@@ -189,11 +189,11 @@ export const createSession = (deps: SessionDeps = {}): Session => {
     hasVisited: () =>
       state !== null &&
       storage.getItem(LS_KEY_VISITED) ===
-        uint8ArrayToBase64(deriveKeyPair(active().keyPairSeed).publicKey),
+        uint8ArrayToBase64(getKeyPairFromSeed(active().keyPairSeed).publicKey),
     markVisited() {
       storage.setItem(
         LS_KEY_VISITED,
-        uint8ArrayToBase64(deriveKeyPair(active().keyPairSeed).publicKey),
+        uint8ArrayToBase64(getKeyPairFromSeed(active().keyPairSeed).publicKey),
       )
       notify()
     },

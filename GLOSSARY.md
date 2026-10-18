@@ -60,7 +60,7 @@ the bytes between devices.
 ## Wire Protocol
 
 The frontend↔server protocol: base64 headers (`Public-Key`, `Hashed-Pin`,
-`Protector`, `Timestamp`, `Signature`), bodies of
+`Protector`, `Timestamp`, `Signature`, and `Nonce` in v2), bodies of
 `base64(signature ‖ 4-byte LE timestamp ‖ payload)`, four endpoints
 (`/api/profiles/`, `/api/credentials/`). GET/DELETE on credentials carry no
 signature at all (factors instead of a signature).
@@ -68,7 +68,8 @@ signature at all (factors instead of a signature).
 Two versions ([ADR-0003](docs/adr/0003-protocol-v2.md)): **v1** — symmetric ±300 s window, signatures over
 `timestamp` (headers) / `ts ‖ payload` (bodies), replay protection on POST
 only. **v2** — requested via the `Protocol-Version: 2` header: signatures
-include the HTTP method (`method ‖ ts` / `method ‖ ts ‖ payload`), the
+include the HTTP method and a per-request nonce
+(`method ‖ ts ‖ nonce` / `method ‖ ts ‖ nonce ‖ payload`), the
 window is one-sided `0 ≤ now − ts ≤ 300`, replay protection covers every
 signed request, and the wire Hashed-Pin is the client-side PBKDF2 (see
 Hashed PIN). The server speaks both; v1 stays for devices with cached older

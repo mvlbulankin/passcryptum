@@ -32,6 +32,7 @@ describe('base64 helpers', () => {
     for (let i = 0; i < bytes.length; i += 65536) {
       bytes.set(crypto.getRandomValues(new Uint8Array(65536)), i)
     }
+
     const encoded = uint8ArrayToBase64(bytes)
 
     expect(encoded.length).toBeGreaterThan(bytes.length)

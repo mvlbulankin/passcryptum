@@ -1,150 +1,87 @@
 # Passcryptum core
 
-This package contains all the cryptographic functionality of Passcryptum.
-Its creation is motivated by the intention of separating this logic from
-the one of the application interface. Being separated, this functionality
-doesn't depend on the interface framework or gets confused with the off-side
-areas of responsibility.
+The modules that hold secrets: the session, the vault, the wire client, PIN
+handling and the crypto primitives underneath. Nothing here knows about Vue
+or the DOM — the one exception is `src/entities/session`, which projects the
+session into reactive state.
+
+Import from the barrel (`#/core`) only. `core/index.ts` lists the surface the
+application actually uses; everything else is an implementation detail, and
+`modules/core/test/barrel.spec.ts` fails the build if `src/` reaches past it.
+
+## What is here
+
+| Module | Owns |
+|---|---|
+| `session/` | who is logged in: the derived keys, the vault instance, the online/offline mode, PIN availability |
+| `vault/` | Services as stored on the device: one encrypted blob, its format, export to a file and import back |
+| `wire/` | the Wire Protocol client — the only way the app talks to the server |
+| `pin/` | storing and releasing the Origin Buffer under a PIN |
+| `generator/` | service password derivation from Entropy |
+| `actions/`, `shared/` | PIN-derived AES material and crypto/encoding primitives |
+| `constants.ts` | protocol and storage constants (iterations, key names, minimum PIN length) |
 
 ## Logging in and out
 
-All the functionality of the Passcryptum core is built on cryptographic data
-received from the origin password. By 'logging in' we mean getting these data
-by the Passcryptum core (the start of an active session). Thus, 'logging out'
-means deletion of these data from the RAM (the end of an active session).
+"Logging in" means deriving the Origin Buffer and starting a session;
+"logging out" means destroying it.
 
-Starting the session, the Passcryptum core client receives the session ID
-(a string, four Latin letters), and saved data for this session
-(a custom string, e.g. JSON).
+```ts
+createSession(options?): Session
 
-### Logging in using an origin password
-
-```typescript
-declare const enterWithOriginPassword: (
-  password: string,
-) => Promise<{ id: string; data: string | null }>
+Session.enter(password): Promise<StarterKit>   // origin password
+Session.enterWithPin(pin): Promise<StarterKit> // offline or online PIN
+Session.exit(): void
 ```
 
-Takes string (origin password), launches the session.
-Returns the object asynchronously with the identifier and the data.
-Slow cryptography is used, calculation may take some time.
+`StarterKit` carries the Profile id and the stored Services (or `null`).
+`enter` is slow by design: PBKDF2 with 262 144 iterations.
 
-### Logging in using PIN
+After `exit()`, every secret accessor throws `SessionClosedError`; the vault
+closes with it, and the Origin Buffer is zeroized before the reference is
+dropped.
 
-```typescript
-declare const enterWithPin: (
-  pin: string,
-) => Promise<{ id: string; data: string | null }>
+## Reading and writing Services
+
+```ts
+Session.vault(): Vault
+
+Vault.read(): Promise<ServicesConfig | null>
+Vault.write(services): Promise<void>
+Vault.clear(): Promise<void>
+Vault.exportBytes(): Promise<Uint8Array | null>
+Vault.importBytes(bytes): Promise<ServicesConfig | null>
+Vault.importText(text): Promise<ServicesConfig | null>
 ```
 
-Takes string (PIN). Searches for the encrypted hash of the origin password
-in the local storage and tries to decrypt it. Slow cryptography is used,
-calculation may take some time. If unsuccessful, throws an exception.
-Launches the session.
-Returns the object asynchronously with the identifier and the data.
+The interface speaks `ServicesConfig`. The on-disk envelope (marker, per-save
+IV, AES-CBC), the pre-3.0 static-IV format and hex encoding stay inside the
+module. A blob that cannot be read is dropped and reported as `null`.
 
-### Logging out
+## Talking to the server
 
-```typescript
-declare const exit: () => void
+```ts
+wire.getServices(keyPairSeed) / setServices(...) / clearServices(...)
+wire.getEntropy(...) / createCredential(...) / deleteCredential(...)
 ```
 
-Ends the session. All the functions depending on the session data stop working
-(start throwing an exception).
+Each function is one Wire Protocol endpoint; framing, signing, nonce and
+version headers are internal. Failures are `WireError` with a `kind`;
+`isForbidden(e)` answers the one case the UI treats specially.
 
-## Data keeping
+## Subscribing to state
 
-### Data saving
-
-```typescript
-declare const saveData: (data: string) => Promise<void>
+```ts
+Session.subscribe(listener): () => void
 ```
 
-Throws an exception if the session is inactive.
+The session is plain state; `src/entities/session` wraps it in refs and
+re-reads on change. PIN flags are derived from storage on each read, never
+snapshotted — a stale flag cannot appear.
 
-Takes the string (e.g. JSON). The string is encrypted by the active session data
-and saves into the local storage.
+## Tests
 
-### Reading the encrypted data
-
-```typescript
-declare const readData: (data: string | ArrayBuffer) => Promise<string | null>
-```
-
-Throws an exception if the session is inactive.
-
-Takes a string or a buffer. Tries to decipher it with the active session data.
-If unsuccessful, returns `null`.
-Returns decrypted data of the passed argument as a string.
-
-### Getting data
-
-```typescript
-declare const getDataAsBuffer: () => Promise<ArrayBuffer | null>
-declare const getDataAsString: () => Promise<string | null>
-declare const getDataDecrypted: () => Promise<string | null>
-```
-
-Throws an exception if the session is inactive.
-
-First two functions return encrypted data saved to the local storage
-with the active session key. The type of returned data differs:
-
-- `getDataAsBuffer` — binary view;
-- `getDataAsString` — hex string.
-
-The last function `getDataDecrypted` returns the decrypted data string.
-
-### Deleting data
-
-```typescript
-declare const deleteData: () => void
-```
-
-Throws an exception if the session is inactive.
-
-Deletes data saved into the local storage with the active session key.
-
-## PIN
-
-### PIN status check
-
-```typescript
-declare const isTherePin: () => boolean
-```
-
-Returns `true` if the PIN is set, otherwise returns `false`.
-
-### PIN setting
-
-```typescript
-declare const setPin: (pin: string) => Promise<void>
-```
-
-Throws an exception if the session is inactive.
-
-Sets the passed PIN and writes it into the local storage.
-
-### PIN deletion
-
-```typescript
-declare const deletePin: () => void
-```
-
-Deletes PIN.
-
-## Password generation
-
-```typescript
-declare const generatePassword: (
-  serviceName: string,
-  login: string,
-  version: number,
-  useSymbols: boolean,
-  length: number,
-) => Promise<string>
-```
-
-Throws an exception if the session is inactive.
-
-Calculates the password on the basis of the current session and passed parameters.
+Specs live next to the code (`*/test/*.spec.ts`) and run in `happy-dom`, so
+localStorage and the DOM are available. `wire/test/live.spec.ts` additionally
+talks to a real backend when `PC_BASE_URL` (and a profile's keys) are set;
+`e2e/run.sh` runs it on every invocation.

@@ -20,6 +20,8 @@ export type { WireErrorKind } from './wire'
 
 export { generatePassword } from './generator'
 
+export { MIN_PIN_LENGTH } from './constants'
+
 // Transport crypto: the session's secretbox keys wrap vault bytes for the
 // wire. Encoding helpers are needed wherever bytes meet text.
 export {

@@ -1,6 +1,4 @@
-import type { ServicesConfig } from '../../../services/types'
-import { parse } from '../../../services/features/lib/parse'
-import { stringify } from '../../../services/features/lib/stringify'
+import { parse, stringify, type ServicesConfig } from '../../../services'
 
 // The blob format. Current:
 //
