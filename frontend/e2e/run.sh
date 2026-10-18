@@ -70,12 +70,12 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
   -addext "subjectAltName=DNS:localhost,DNS:$CADDY_NAME,IP:$HOST_ADDR,IP:127.0.0.1" \
   -keyout "$CERT_DIR/key.pem" -out "$CERT_DIR/cert.pem" 2>/dev/null
 
-cat > "$CERT_DIR/Caddyfile" <<CADDY
-:$TLS_PORT {
-	tls /certs/cert.pem /certs/key.pem
-	reverse_proxy $HOST_ADDR:$PORT
-}
-CADDY
+# The e2e stack runs the PRODUCTION Caddyfile: the security headers, the
+# body cap and the CSP are part of what is being tested. Only the address,
+# the TLS pair and the upstream are overridden.
+cat > "$CERT_DIR/tls.caddy" <<'TLS'
+tls /certs/cert.pem /certs/key.pem
+TLS
 
 docker rm -f "$CADDY_NAME" >/dev/null 2>&1 || true
 docker network rm "$NET" >/dev/null 2>&1 || true
@@ -83,8 +83,12 @@ docker network create "$NET" >/dev/null
 # Caddy is the only TLS endpoint the browser talks to; on a user-defined
 # network its name resolves as a host.
 docker run -d --name "$CADDY_NAME" --network "$NET" \
-  -v "$CERT_DIR/Caddyfile:/etc/caddy/Caddyfile:ro" \
+  -v "$ROOT/gateway/Caddyfile:/etc/caddy/Caddyfile:ro" \
   -v "$CERT_DIR:/certs:ro" \
+  -v "$CERT_DIR:/tls:ro" \
+  -e "SITE_ADDRESS=:$TLS_PORT" \
+  -e "TLS_DIR=/tls" \
+  -e "UPSTREAM=$HOST_ADDR:$PORT" \
   caddy:2 >/dev/null
 
 for _ in $(seq 1 60); do

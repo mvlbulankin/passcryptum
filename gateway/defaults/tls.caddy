@@ -1,0 +1,5 @@
+# Production default: nothing to configure, Caddy obtains and renews the
+# certificate itself (Let's Encrypt, ZeroSSL fallback).
+#
+# The e2e stack overrides TLS_DIR with a directory holding its own
+# tls.caddy, which pins a self-signed certificate for the local address.

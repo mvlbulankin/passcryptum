@@ -16,11 +16,26 @@ RUN go mod download
 COPY --from=frontend /app/dist ./web
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/passcryptum .
 
+# The data directory is created here so the named volume inherits its
+# ownership: a volume mounted over a root-owned path would leave the
+# non-root process unable to write its SQLite file.
+RUN mkdir -p /out/data && chown 65532:65532 /out/data
+
 FROM scratch
-COPY --from=backend /out/passcryptum /passcryptum
+
+# Nothing runs as root: the binary owns no privileged resource and the
+# listening port is unprivileged (Caddy terminates :443 in front).
+USER 65532:65532
+
+COPY --from=backend --chown=65532:65532 /out/passcryptum /passcryptum
 COPY --from=backend /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=backend --chown=65532:65532 /out/data /data
+
 VOLUME /data
-ENV PC_DB=/data/passcryptum.db
+# Writable scratch for SQLite temporaries; the rest of the filesystem is
+# read-only in compose.
+ENV PC_DB=/data/passcryptum.db \
+    TMPDIR=/tmp
 EXPOSE 8000
 ENTRYPOINT ["/passcryptum"]
 CMD ["serve", ":8000"]

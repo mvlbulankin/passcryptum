@@ -1,11 +1,17 @@
-# Caddyfile — production template (ADR-0003, gateway).
+# Caddyfile — production template.
 # Caddy handles the whole TLS lifecycle for the ddns domain automatically:
 # obtains (Let's Encrypt, ZeroSSL fallback), renews, redirects HTTP->HTTPS.
 # No certbot, no cert paths, survives IP changes as long as DNS follows.
 #
 # EDIT the domain below to your real one.
+#
+# Two knobs exist so the same file can serve the e2e stack, which runs Caddy
+# against a local self-signed cert and an address instead of a DNS name:
+#   SITE_ADDRESS — the site block's address (default: the domain above)
+#   TLS_CERT / TLS_KEY — fixed certificate files instead of automatic ACME
+# Both are unset in production, where they must stay unset.
 
-passcryptum.ddns.net {
+{$SITE_ADDRESS:passcryptum.ddns.net} {
 	# Security headers (HSTS is added by Caddy automatically on https)
 	request_body {
 		max_size 1048576
@@ -15,11 +21,24 @@ passcryptum.ddns.net {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "no-referrer"
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		# A password manager should not be a popup's opener: with COOP the app
+		# gets a fresh browsing context group, so a window it opens cannot
+		# reach back through window.opener.
+		Cross-Origin-Opener-Policy "same-origin"
+		# The script hash changes with every build and lives in the document's
+		# meta tag, so this policy must NOT contain script-src: two policies
+		# intersect, and a stricter header would veto the meta hash (verified:
+		# it does). Everything here is a directive meta cannot express.
+		Content-Security-Policy "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 	}
+
+	# e2e supplies TLS_CERT/TLS_KEY (its own self-signed pair). Production
+	# leaves them unset and Caddy does automatic ACME — hence the import,
+	# which is a no-op file there.
+	import {$TLS_DIR:/etc/caddy/defaults}/tls.caddy
 
 	encode zstd gzip
 
-	reverse_proxy backend:8000
+	reverse_proxy {$UPSTREAM:backend:8000}
 }
 
