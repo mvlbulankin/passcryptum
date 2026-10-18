@@ -8,8 +8,7 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "typeRoots": ["node_modules/@types", "env.d.ts"],
-    "baseUrl": ".",
+    "typeRoots": ["node_modules/@types"],
     "paths": {
       "#/*": ["./modules/*"],
       "@/*": ["./src/*"]
