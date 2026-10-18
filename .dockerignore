@@ -1,14 +1,20 @@
+# Build context hygiene. The image is built from the repo root and needs only
+# backend/ and frontend/ — everything else is dead weight in the context.
 .git
+.github
+docs
+.scratch
+.agents
+.pi
+
+# dependencies and build output are produced inside the image
 node_modules
 **/node_modules
 frontend/dist
-frontend/node_modules
-backend/db.sqlite3
-backend/contract/.venv
-backend/contract/.contract-db
-backend/contract/.server.log
+backend/web
+
+# local data and scratch
 *.sqlite3
 *.db
-.scratch
-images
-docs
+*.db-shm
+*.db-wal
