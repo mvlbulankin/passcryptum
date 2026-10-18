@@ -49,6 +49,14 @@ The encrypted AES-CBC blob of the user's data (logins and per-service
 password settings). Opaque to the server. Stored in the Profile;
 synchronized between the user's devices.
 
+## Vault
+
+Services as they live on the device: one encrypted blob (the current format
+carries a marker and a fresh IV per save; pre-3.0 blobs with a static IV are
+still readable), plus everything about how it is stored, exported to a file
+and imported back. The Vault owns the format; the Wire Protocol only carries
+the bytes between devices.
+
 ## Wire Protocol
 
 The frontend↔server protocol: base64 headers (`Public-Key`, `Hashed-Pin`,

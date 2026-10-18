@@ -1,6 +1,5 @@
 import {
   add,
-  stringify,
   deleteLogin,
   deleteService,
   ServicesConfig,
@@ -11,7 +10,7 @@ import {
   updateServicePreferences,
 } from '#/services'
 import { ref, computed } from 'vue'
-import { saveData, deleteData } from '#/core'
+import { getVault } from '#/core'
 
 import {
   privateServices,
@@ -36,7 +35,7 @@ export const setOfflinePinState = (value: boolean) => {
 
 export const sessionId = computed(() => privateSessionId.value)
 
-const saveServices = () => saveData(stringify(privateServices.value))
+const saveServices = () => getVault().write(privateServices.value)
 
 export const addServiceAndLogin = (serviceName: string, loginName: string) => {
   add(privateServices.value, serviceName.trim(), loginName.trim())
@@ -58,7 +57,7 @@ export const areServicesEmpty = computed(() =>
 )
 
 export const clearServices = () => {
-  deleteData()
+  void getVault().clear()
 
   privateServices.value = createEmptyServices()
 }

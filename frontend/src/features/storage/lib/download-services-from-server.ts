@@ -1,6 +1,6 @@
 import { useDialog, useMessage, useLoadingBar } from 'naive-ui'
-import { decryptBlob, decryptData, getSession, isForbidden, wire } from '#/core'
-import { parse, checkForEmptiness } from '#/services'
+import { decryptData, getSession, getVault, isForbidden, wire } from '#/core'
+import { checkForEmptiness } from '#/services'
 
 import { importServices } from '@/entities/session'
 import { showStorageDrawer } from '@/features/storage/model'
@@ -16,44 +16,30 @@ export const useDownloadServices = () => {
     loadingBar.start()
 
     try {
-      const { keyPairSeed, cryptoKey, iv, secretBoxIv, secretBoxKey } = getSession()
-      const encrypted = await wire.getServices(keyPairSeed)
+      const { keyPairSeed, secretBoxIv, secretBoxKey } = getSession()
+      const envelope = await wire.getServices(keyPairSeed)
 
-      if (!encrypted) {
+      if (!envelope) {
         message.error('Services not found on server')
 
         return
       }
 
-      // The server holds the vault blob as stored locally: the 0x01-marked
-      // AES envelope (marker ‖ per-save IV ‖ ciphertext, see save-data.ts).
-      // It is AES, not secretbox — decryptBlob is the reader for both the v2
-      // envelope and the legacy static-IV layout.
-      // Two layers, in order: secretbox (transport, session-bound) then the
-      // local AES envelope (0x01 marker ‖ per-save IV ‖ ciphertext).
-      const envelope = decryptData(encrypted, secretBoxIv, secretBoxKey)
+      // Unwrap the transport layer, then hand the bytes to the vault: it is
+      // the only module that knows the storage format.
+      const bytes = decryptData(envelope, secretBoxIv, secretBoxKey)
 
-      if (!envelope) {
+      if (!bytes) {
         throw new Error('Failed to decrypt data')
       }
 
-      const plaintext = await decryptBlob(
-        new Uint8Array(envelope).buffer,
-        iv,
-        cryptoKey,
-      )
+      const config = await getVault().importBytes(new Uint8Array(bytes).buffer)
 
-      if (!plaintext) {
-        throw new Error('Failed to read downloaded services')
+      if (!config || checkForEmptiness(config)) {
+        throw new Error('Downloaded vault is empty')
       }
 
-      const parsedServices = parse(plaintext)
-
-      if (checkForEmptiness(parsedServices)) {
-        throw new Error('Parsed services is empty')
-      }
-
-      await importServices(parsedServices)
+      await importServices(config)
       message.success('Services have been downloaded from server successfully')
     } catch (e) {
       if (isForbidden(e)) {

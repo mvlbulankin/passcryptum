@@ -1,7 +1,12 @@
 import { useDialog, useMessage, useLoadingBar } from 'naive-ui'
-import { getSession, encryptData, getDataAsBuffer, wire, isForbidden  } from '#/core'
+import {
+  encryptData,
+  getSession,
+  getVault,
+  isForbidden,
+  wire,
+} from '#/core'
 
-import { areServicesEmpty } from '@/entities/session'
 import { showStorageDrawer } from '@/features/storage/model'
 
 import { showPublicKeyError } from './public-key-error'
@@ -15,22 +20,21 @@ export const useUploadServices = () => {
     loadingBar.start()
 
     try {
-      const buffer = await getDataAsBuffer()
+      // The vault knows how Services are stored; the transport wraps those
+      // bytes in a secretbox bound to this session's keys. Two concerns,
+      // two owners — the composition is three lines.
+      const bytes = await getVault().exportBytes()
 
-      if (!buffer) {
-        throw new Error('Empty buffer when uploading services')
+      if (!bytes) {
+        message.error('There is nothing to upload')
+
+        return
       }
 
       const { keyPairSeed, secretBoxIv, secretBoxKey } = getSession()
+      const envelope = encryptData(bytes, secretBoxIv, secretBoxKey)
 
-      const encryptedServices = encryptData(
-        new Uint8Array(buffer),
-        secretBoxIv,
-        secretBoxKey,
-      )
-
-      await wire.setServices(keyPairSeed, encryptedServices)
-
+      await wire.setServices(keyPairSeed, envelope)
       message.success('Services have been uploaded to server successfully')
     } catch (e) {
       if (isForbidden(e)) {
@@ -44,5 +48,5 @@ export const useUploadServices = () => {
     }
   }
 
-  return { uploadServices, areServicesEmpty }
+  return { uploadServices }
 }

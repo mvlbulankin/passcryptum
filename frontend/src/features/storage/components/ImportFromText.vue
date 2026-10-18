@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { readData } from '#/core'
 import { BookOutline, ClipboardOutline } from '@vicons/ionicons5'
-import { parse, checkForEmptiness, ServicesConfig } from '#/services'
 import { NH4, NIcon, NInput, NSpace, useMessage, useLoadingBar } from 'naive-ui'
+import { getVault } from '#/core'
+import { checkForEmptiness } from '#/services'
 
 import { FormSubmit } from '@/shared'
 import { importServices, isCalculationInProgress } from '@/entities/session'
@@ -12,41 +12,29 @@ const message = useMessage()
 const servicesString = ref('')
 const loadingBar = useLoadingBar()
 
-const setServices = (config: ServicesConfig) =>
-  importServices(config).then(() => {
-    requestAnimationFrame(() => loadingBar.finish())
-    message.success('Services have been imported')
-  })
-
 const onSubmit = async () => {
-  const { value } = servicesString
-  const configAsIs = parse(value)
+  const text = servicesString.value
 
   servicesString.value = ''
   isCalculationInProgress.value = true
-
   loadingBar.start()
 
-  if (checkForEmptiness(configAsIs)) {
-    const dataFromDecryption = await readData(value)
+  // The vault accepts both pasted plaintext (a JSON export) and an
+  // encrypted blob — one entry point, no format guessing in the caller.
+  const config = await getVault().importText(text)
 
-    isCalculationInProgress.value = false
+  isCalculationInProgress.value = false
 
-    const decryptedConfig = parse(dataFromDecryption)
+  if (!config || checkForEmptiness(config)) {
+    loadingBar.error()
+    message.error('An error occurred while importing')
 
-    if (checkForEmptiness(decryptedConfig)) {
-      loadingBar.error()
-      message.error('An error occurred while importing')
-
-      return
-    }
-
-    await setServices(decryptedConfig)
-  } else {
-    await setServices(configAsIs)
-
-    isCalculationInProgress.value = false
+    return
   }
+
+  await importServices(config)
+  loadingBar.finish()
+  message.success('Services have been imported')
 }
 </script>
 

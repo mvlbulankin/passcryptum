@@ -5,4 +5,5 @@ export const E2E_PASSWORDS = [
   'correct horse battery staple e2e',
   'definitely not the password',
   'sync between devices e2e',
+  'file round trip e2e',
 ]

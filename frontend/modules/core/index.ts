@@ -1,27 +1,15 @@
 export {
-  readData,
-  saveData,
-  deleteData,
-  getDataAsString,
-  getDataAsBuffer,
-  getDataDecrypted,
-} from './data'
-
-export {
   decryptData,
   encryptData,
-  base64ToBuffer,
-  bufferToBase64,
   getHashOfString,
   getKeyPairFromSeed,
+  base64ToBuffer,
+  bufferToBase64,
   base64ToUint8Array,
   uint8ArrayToBase64,
 } from './shared'
 
-// Actions: AES blob helpers (legacy + v2 envelope) and pin derivation.
-export { decryptBlob, createPinAesData } from './actions'
-
-export { getEncryptedHash, getEncryptedOnlineHash } from './actions'
+export { createPinAesData } from './actions'
 
 export { generatePassword } from './generator'
 
@@ -29,6 +17,11 @@ export { generatePassword } from './generator'
 export { wire, WireError, isForbidden } from './wire'
 
 export type { WireErrorKind, Transport, WireClient } from './wire'
+
+// Vault: Services as stored on this device.
+export { VaultClosedError } from './vault'
+
+export type { Vault } from './vault'
 
 export {
   setOnlinePin,
@@ -42,6 +35,7 @@ export {
 export {
   exit,
   getSession,
+  getVault,
   enterWithPin,
   enterWithOriginPassword,
 } from './session'

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { readData, saveData } from '#/core'
 import { DocumentOutline } from '@vicons/ionicons5'
-import { parse, stringify, checkForEmptiness } from '#/services'
 import { NH4, NButton, useMessage, useLoadingBar } from 'naive-ui'
+import { getVault } from '#/core'
+import { checkForEmptiness } from '#/services'
 
 import { importServices } from '@/entities/session'
 
@@ -11,8 +11,12 @@ const loadingBar = useLoadingBar()
 const element = document.createElement('input')
 
 element.setAttribute('type', 'file')
+element.setAttribute('hidden', '')
+// Attached to the document so the control is reachable (assistive tech,
+// automation); the visible affordance stays the button below.
+document.body.append(element)
 
-element.addEventListener('input', async () => {
+element.addEventListener('change', async () => {
   const [file] = Array.from(element.files as FileList)
 
   element.value = ''
@@ -23,21 +27,20 @@ element.addEventListener('input', async () => {
 
   loadingBar.start()
 
-  const dataFromDecryption = await readData(await file.arrayBuffer())
+  const config = await getVault().importBytes(await file.arrayBuffer())
 
-  const config = parse(dataFromDecryption)
-
-  if (checkForEmptiness(config)) {
+  if (!config || checkForEmptiness(config)) {
     loadingBar.error()
     message.error('An error occurred while importing')
-  } else {
-    importServices(config)
 
-    await saveData(stringify(config))
-
-    loadingBar.finish()
-    message.success('Services have been imported')
+    return
   }
+
+  // importServices persists through the vault; writing again here would
+  // store an unmerged copy over the merged one.
+  await importServices(config)
+  loadingBar.finish()
+  message.success('Services have been imported')
 })
 
 const onClick = () => element.click()

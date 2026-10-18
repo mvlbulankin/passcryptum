@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getDataAsBuffer } from '#/core'
+import { getVault } from '#/core'
 import { NButton, useLoadingBar } from 'naive-ui'
 import { DownloadOutline } from '@vicons/ionicons5'
 
@@ -12,13 +12,15 @@ const BINARY_MIME_TYPE = 'application/octet-stream'
 const onClick = async () => {
   loadingBar.start()
 
-  const buffer = await getDataAsBuffer()
+  const buffer = await getVault().exportBytes()
 
   if (!buffer) {
-    throw new Error('Empty buffer when downloading a file')
+    throw new Error('There is nothing to download')
   }
 
-  const blob = new Blob([buffer], { type: BINARY_MIME_TYPE })
+  const blob = new Blob([new Uint8Array(buffer).buffer], {
+    type: BINARY_MIME_TYPE,
+  })
 
   linkElement.href = URL.createObjectURL(blob)
   linkElement.download = `${sessionId.value}.dat`

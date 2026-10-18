@@ -1,10 +1,11 @@
 import { base64ToBuffer, bufferToBase64 } from '#/core'
 
 import { isOnlineMode } from '@/features/online-mode'
-import { getLsData } from '../lib/get-ls-data'
 import { parseOriginBuffer } from '../lib/parse-origin-buffer'
+import { stringify } from '../../../services/features/lib/stringify'
 import { ActiveSession, StarterKit } from '../types'
 
+import { createVault, type Vault } from '../../vault'
 import { decrypt, pbkdf2, createAesKey, getBufferOfText } from '../../shared'
 import {
   ORIGIN_BUFFER_ITERATIONS,
@@ -17,6 +18,7 @@ import {
 } from '../../actions'
 
 let session: ActiveSession | null = null
+let activeVault: Vault | null = null
 
 export const getSession = () => {
   if (!session) {
@@ -58,10 +60,24 @@ const startSession = async (buffer: ArrayBuffer): Promise<StarterKit> => {
     originBuffer: buffer,
   }
 
+  // The vault is created with the session and dies with it.
+  activeVault = createVault({ lsKey, cryptoKey, legacyIv: iv })
+
+  const services = await activeVault.read()
+
   return {
     id,
-    data: await getLsData(lsKey, iv, cryptoKey),
+    data: services === null ? null : stringify(services),
   }
+}
+
+/** The vault of the active session. Throws when there is no session. */
+export const getVault = (): Vault => {
+  if (!activeVault) {
+    throw new Error('Attempt to access an inactive session')
+  }
+
+  return activeVault
 }
 
 export const enterWithOriginPassword = async (
@@ -122,5 +138,7 @@ export const exit = () => {
     zeroizeSession(session)
   }
 
+  activeVault?.close()
+  activeVault = null
   session = null
 }
