@@ -73,6 +73,37 @@ Profiles exist only if their public key was added by the admin (CLI
 `add-public-key` / `delete-public-key`) — there is no registration by
 design.
 
+### Running it locally
+
+`gateway/Caddyfile` defaults to the production domain, and Caddy treats a
+domain it does not hold a certificate for as an instruction to go and get
+one. Starting the stack on a laptop therefore sends **real** ACME requests
+for your domain — and Let's Encrypt answers with rate limits (5 failed
+validations per hour per identifier, then a lockout), so a few local runs
+can block the actual deploy.
+
+Serve from Caddy's internal CA instead: point `TLS_DIR` at `gateway/local`,
+which contains a one-line `tls internal`. Caddy then issues a local
+certificate and never contacts a public CA.
+
+```bash
+# Gateway only, serving on https://localhost:8443 from the internal CA
+docker run --rm -p 8443:8443 \
+  -v "$PWD/gateway/Caddyfile:/etc/caddy/Caddyfile:ro" \
+  -v "$PWD/gateway/local:/etc/caddy/local:ro" \
+  -e SITE_ADDRESS=localhost:8443 \
+  -e TLS_DIR=/etc/caddy/local \
+  -e UPSTREAM=<host>:8000 \
+  caddy:2
+```
+
+Browsers warn about the certificate until you trust Caddy's local root
+(`docker run ... caddy trust`, or import the root from the `caddy_data`
+volume) — expected: that certificate is for the local machine only. The
+e2e suite (`frontend/e2e/run.sh`) does the same thing with its own
+self-signed pair. Production runs set none of these variables, which is
+what makes Caddy use ACME.
+
 ### Environment
 
 | variable | default | meaning |

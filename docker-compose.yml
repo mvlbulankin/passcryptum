@@ -1,6 +1,12 @@
 # Passcryptum: two containers (ADR-0001) — Go binary (API + embedded SPA +
 # SQLite) behind Caddy (automatic TLS for the ddns domain, security headers).
 #
+# Production host only. Caddy obtains a REAL certificate for the domain in
+# gateway/Caddyfile, so `docker compose up` from any machine the domain does
+# not resolve to spends Let's Encrypt rate limits (5 failed validations per
+# hour, then a lockout). To poke at the stack locally, run the gateway alone
+# against the internal CA — see "Running it locally" in README.md.
+#
 # Build from the repo root:
 #   docker build -f backend/Dockerfile -t passcryptum-go .
 # Onboard a key (generate one with: docker compose run --rm backend genkey):

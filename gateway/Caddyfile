@@ -5,11 +5,17 @@
 #
 # EDIT the domain below to your real one.
 #
-# Two knobs exist so the same file can serve the e2e stack, which runs Caddy
-# against a local self-signed cert and an address instead of a DNS name:
+# Three knobs exist so the same file can serve anything that is not the
+# deployed domain. All are unset in production, where they must stay unset:
 #   SITE_ADDRESS — the site block's address (default: the domain above)
 #   TLS_CERT / TLS_KEY — fixed certificate files instead of automatic ACME
-# Both are unset in production, where they must stay unset.
+#   TLS_DIR — directory holding the tls.caddy imported below; point it at
+#     gateway/local to serve from Caddy's internal CA (no public ACME)
+#
+# Running it locally: see "Running it locally" in README.md.
+# Do not point SITE_ADDRESS at the production domain from a machine that
+# domain does not resolve to — Caddy will then try to obtain a real
+# certificate for it.
 
 {$SITE_ADDRESS:passcryptum.ddns.net} {
 	# Security headers (HSTS is added by Caddy automatically on https)
@@ -32,13 +38,13 @@
 		Content-Security-Policy "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 	}
 
-	# e2e supplies TLS_CERT/TLS_KEY (its own self-signed pair). Production
-	# leaves them unset and Caddy does automatic ACME — hence the import,
-	# which is a no-op file there.
+	# e2e supplies TLS_CERT/TLS_KEY (its own self-signed pair); local runs
+	# point TLS_DIR at gateway/local ("tls internal"). Production leaves both
+	# unset and Caddy does automatic ACME — hence the import, which is a no-op
+	# file there.
 	import {$TLS_DIR:/etc/caddy/defaults}/tls.caddy
 
 	encode zstd gzip
 
 	reverse_proxy {$UPSTREAM:backend:8000}
 }
-

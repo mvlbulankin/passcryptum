@@ -1,0 +1,11 @@
+# Local development: serve from Caddy's internal CA instead of a public one.
+#
+# Point TLS_DIR at this directory (see "Running it locally" in README.md) when
+# running the stack on a machine the production domain does not resolve to.
+# Caddy then issues a locally-trusted-looking certificate and never contacts
+# Let's Encrypt — so a local run cannot burn the domain's ACME rate limits
+# (5 failed validations per hour, and a week-long lockout after repeats).
+#
+# Browsers will warn until you trust Caddy's local root, which is the point:
+# the certificate is for this machine only, never for a real deployment.
+tls internal
