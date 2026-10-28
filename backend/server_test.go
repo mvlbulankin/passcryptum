@@ -6,8 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -344,6 +347,42 @@ func TestMethodNotAllowed(t *testing.T) {
 
 // The timestamp window is a protocol constant; with the clock injected its
 // boundaries are testable exactly instead of approximately.
+// A protocol rejection (400) and a domain denial (403) each leave an audit
+// line, and the two stay distinguishable in the log — the skew incident was
+// diagnosed blind because 400s were silent.
+func TestWireRejectionAndDenialAuditLines(t *testing.T) {
+	f := newFixture(t)
+	f.onboard(testPubB)
+
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	if w := f.serve(f.signedGet("/api/profiles/", -301)); w.Code != http.StatusBadRequest {
+		t.Fatalf("stale timestamp: got %d, want 400", w.Code)
+	}
+
+	if s := buf.String(); !strings.Contains(s, "rejected GET /api/profiles/") ||
+		!strings.Contains(s, "reason=Timestamp: Invalid timestamp") {
+		t.Fatalf("rejection audit line missing or malformed: %q", s)
+	}
+
+	buf.Reset()
+
+	if _, err := f.st.DeletePublicKey(testPubB); err != nil {
+		t.Fatal(err)
+	}
+
+	if w := f.serve(f.signedGet("/api/profiles/", 0)); w.Code != http.StatusForbidden {
+		t.Fatalf("unknown profile: got %d, want 403", w.Code)
+	}
+
+	if s := buf.String(); !strings.Contains(s, "denied GET /api/profiles/") ||
+		strings.Contains(s, "rejected") {
+		t.Fatalf("denial audit line missing or not distinct: %q", s)
+	}
+}
+
 func TestTimestampWindowBoundaries(t *testing.T) {
 	f := newFixture(t)
 	f.onboard(testPubB)

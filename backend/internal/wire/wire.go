@@ -36,6 +36,14 @@ const nonceSize = 16
 // TimestampTolerance is the protocol's ±300 s request window (ADR-0002).
 const TimestampTolerance = 300 * time.Second
 
+// FutureTolerance is the v2 grace for a client clock running ahead: v2
+// accepts −FutureTolerance ≤ now−ts ≤ TimestampTolerance (ADR-0003,
+// amendment 2026-10-28). Zero tolerance rejected real devices whose RTC had
+// drifted by a second; 60 s is the JWT ecosystem's canonical leeway and a
+// fifth of the backward window, so v2 stays far tighter than the symmetric
+// industry defaults.
+const FutureTolerance = 60 * time.Second
+
 // Recipe declares what an endpoint requires from the wire.
 type Recipe struct {
 	// Headers are the required base64 headers, in validation order.
@@ -78,13 +86,13 @@ type Error struct {
 	Field  string
 	Msg    string
 
-	// Reason carries a loggable denial cause for non-400 statuses (e.g. the
-	// replay 403), so the server can emit its audit line.
+	// Reason carries a loggable audit cause, so the server can emit its
+	// line for rejections and denials alike.
 	Reason string
 }
 
 func errField(field, msg string) *Error {
-	return &Error{Status: http.StatusBadRequest, Field: field, Msg: msg}
+	return &Error{Status: http.StatusBadRequest, Field: field, Msg: msg, Reason: field + ": " + msg}
 }
 
 func (e *Error) Error() string { return e.Field + ": " + e.Msg }
@@ -296,10 +304,11 @@ func checkTimestamp(raw []byte, oneSided bool, now func() time.Time) *Error {
 	d := now().Unix() - t
 
 	// v1: symmetric ±300 s (pre-issued requests accepted — pinned quirk).
-	// v2: one-sided 0 <= now-ts <= 300 — a timestamp from the future is
-	// rejected, killing the pre-issued replay form.
+	// v2: one-sided with a 60 s future grace (ADR-0003 amendment): ordinary
+	// client clock drift passes, pre-issued requests beyond the grace stay
+	// rejected.
 	bad := d > int64(TimestampTolerance/time.Second) ||
-		(oneSided && d < 0) ||
+		(oneSided && d < -int64(FutureTolerance/time.Second)) ||
 		(!oneSided && d < -int64(TimestampTolerance/time.Second))
 
 	if bad {

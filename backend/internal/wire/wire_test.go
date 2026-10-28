@@ -337,6 +337,40 @@ func TestV2OneSidedWindow(t *testing.T) {
 	}
 }
 
+// ADR-0003 amendment: v2 tolerates a client clock up to FutureTolerance
+// ahead — zero tolerance rejected real devices with ordinary RTC drift —
+// while any larger future offset keeps the pre-issuance rejection.
+func TestV2FutureGraceWindow(t *testing.T) {
+	cases := []struct {
+		name   string
+		offset int64
+		reject bool
+	}{
+		{"30 s ahead is ordinary clock drift", 30, false},
+		{"60 s ahead is the edge of the grace", 60, false},
+		{"61 s ahead is pre-issued", 61, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := tsOffset(tc.offset)
+			r := httptest.NewRequest("GET", "/api/profiles/", nil)
+			for k, v := range v2Headers(ts, "GET") {
+				r.Header.Set(k, v)
+			}
+
+			_, err := ParseRequest(r, realGuard(), profilesGet)
+			if tc.reject && (err == nil || err.Field != HdrTimestamp) {
+				t.Fatalf("offset +%d: want timestamp rejection, got %+v", tc.offset, err)
+			}
+
+			if !tc.reject && err != nil {
+				t.Fatalf("offset +%d: must pass under the grace, got %v", tc.offset, err)
+			}
+		})
+	}
+}
+
 func TestV2RejectsGETReplay(t *testing.T) {
 	g := realGuard()
 

@@ -104,6 +104,16 @@ func TestV2OneSidedWindow(t *testing.T) {
 	if code, _ := c.v2Do("GET", pathProfiles, nil, c.v2SignedHeaders("GET", ts(-299), v2Nonce(3))); code > 299 {
 		t.Fatalf("v2 recent GET must pass, got %d", code)
 	}
+
+	// The 60 s future grace (ADR-0003 amendment): ordinary clock drift must
+	// pass; anything larger keeps the pre-issuance rejection above.
+	if code, _ := c.v2Do("GET", pathProfiles, nil, c.v2SignedHeaders("GET", ts(30), v2Nonce(4))); code > 299 {
+		t.Fatalf("v2 GET 30 s ahead (grace): got %d, want 2xx", code)
+	}
+
+	if code, _ := c.v2Do("GET", pathProfiles, nil, c.v2SignedHeaders("GET", ts(61), v2Nonce(5))); code != 400 {
+		t.Fatalf("v2 GET 61 s ahead: got %d, want 400", code)
+	}
 }
 
 func TestV2GETReplayRejected(t *testing.T) {

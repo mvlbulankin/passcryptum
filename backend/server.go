@@ -367,13 +367,20 @@ func (s *server) dbFailure(err error) {
 	log.Printf("db error: %v", err)
 }
 
-// writeWireError writes a wire-level failure and logs denials that carry a
-// reason (the replay 403 would otherwise lose its audit line).
+// writeWireError writes a wire-level failure and logs every error that
+// carries a reason. A field-validation rejection (400) is a protocol error,
+// not an auth failure: its line says "rejected" so it stays distinguishable
+// from a "denied" (403) in the log.
 func (s *server) writeWireError(w http.ResponseWriter, r *http.Request, e *wire.Error) {
 	if e.Reason != "" {
+		audit := "denied"
+		if e.Status == http.StatusBadRequest {
+			audit = "rejected"
+		}
+
 		log.Printf(
-			"denied %s %s ip=%s pub=%.8s... reason=%s",
-			r.Method, r.URL.Path, guard.ClientIP(r), r.Header.Get(wire.HdrPublicKey), e.Reason,
+			"%s %s %s ip=%s pub=%.8s... reason=%s",
+			audit, r.Method, r.URL.Path, guard.ClientIP(r), r.Header.Get(wire.HdrPublicKey), e.Reason,
 		)
 	}
 
