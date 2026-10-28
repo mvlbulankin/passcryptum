@@ -1,9 +1,13 @@
-# Contract tests (ADR-0002)
+# Contract tests (ADR-0002, ADR-0003)
 
-Wire-protocol v1 contract tests. They pin what ANY backend must do:
-status codes, success bodies, and the documented v1 quirks (symmetric
-±300 s timestamp window, unsigned credential GET/DELETE, 10-credential eviction,
-services overwrite without versioning).
+Wire-protocol contract tests — v1 in `contract_test.go`, v2 in
+`v2_test.go`. They pin what ANY backend must do: status codes, success
+bodies, and the documented v1 quirks (symmetric ±300 s timestamp window,
+unsigned credential GET/DELETE, 10-credential eviction, services overwrite
+without versioning). The v2 file pins the v2 edges: method-bound nonce
+signatures, replay on every signed request, and the window
+`−60 ≤ now − ts ≤ 300` including the 60 s future grace (ADR-0003,
+amendment 2026-10-28).
 
 This suite is the contract itself.
 

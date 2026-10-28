@@ -54,9 +54,11 @@ versions are independent of product versions (2.x → 3.x).
 
 ## Deploy
 
-1. Any server with Docker. Synced clock is mandatory: requests carry a unix
-   timestamp and the server enforces a 300 s window (one-sided in protocol
-   v2 — a timestamp from the future is rejected).
+1. Any server with Docker. Requests carry a unix timestamp, so keep the
+   clock synced (NTP): the server enforces `−60 ≤ now − ts ≤ 300` in
+   protocol v2 — a client clock may run up to a minute fast; anything
+   further from the future is rejected as pre-issued (ADR-0003) — and a
+   symmetric ±300 s window in v1.
 2. Put your domain into `gateway/Caddyfile` — Caddy obtains and renews the
    certificate automatically (no certbot).
 3. Build and run:

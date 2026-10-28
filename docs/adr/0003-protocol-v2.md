@@ -32,7 +32,8 @@ v1 servable alongside):
    signature (without it, a double GET collided with itself in the replay
    cache: found by the live cross-language test).
 2. **One-sided window.** v2 accepts `0 ≤ now − ts ≤ 300`; timestamps from
-   the future are rejected.
+   the future are rejected. *(Amended 2026-10-28: the future edge carries
+   a 60 s grace — see the amendment at the end.)*
 3. **Replay rejection on every signed request.** v2 GET/DELETE are cached
    in the replay cache as well, keyed by signature + nonce. The nonce makes
    every legitimate request's signature unique, so no accepted edge
