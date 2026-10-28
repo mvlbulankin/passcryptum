@@ -4,6 +4,25 @@ All notable changes to Passcryptum. This project continues
 [nelkor/passcryptum](https://github.com/nelkor/passcryptum) (v2.1.4 was its
 last release).
 
+## 3.0.1
+
+### Fixed
+
+- **Sync on devices with a fast clock.** The v2 time window accepted
+  nothing from the future, so a device clock even one second ahead failed
+  every signed request with `400 Invalid timestamp` — v1's symmetric ±300 s
+  window never had this failure mode; v2 inherited it from the one-sided
+  window (ADR-0003, amendment 2026-10-28). The window is now
+  `−60 ≤ now − ts ≤ 300`: 60 s is the JWT ecosystem's canonical clock-skew
+  leeway. Protocol v1 behavior is unchanged.
+
+### Changed
+
+- Wire 400 rejections are logged (`rejected <method> <path> ip=… pub=…
+  reason=…`), visually distinct from 403 `denied` lines. Previously a
+  timestamp rejection left no trace in the server log, which made the
+  clock-skew incident a blind diagnosis.
+
 ## 3.0.0
 
 2.x was a standalone offline password manager: one file, everything derived

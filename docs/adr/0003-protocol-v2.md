@@ -65,3 +65,27 @@ practical-infeasible for a personal threat model. Costs: PIN entry does two
 deploying v2 requires re-enrolling the online PIN on each device (the
 stored credential hashes the v1 wire value); v1 stays in the codebase until
 a separate retirement decision.
+
+## Amendment (2026-10-28): the future edge gets a 60 s grace
+
+Shipped zero-future-tolerance rejected real devices: a client clock one
+second ahead — ordinary RTC drift between rare time syncs — failed every
+signed request with `400 Invalid timestamp` (incident: Chrome/Win11, +1 s;
+an iPad on the same account worked). The window becomes
+`−60 ≤ now − ts ≤ 300` (`FutureTolerance` in `internal/wire`).
+
+The trade: a pre-issued request is now usable 60 s early, and the validity
+span grows 300 → 360 s — still covered whole by the replay-cache TTL
+(600 s), so exact-duplicate replay stays dead for the entire life of a
+signature. 60 s is the JWT ecosystem's canonical clock-skew leeway and a
+fifth of the backward window; v2 remains far tighter on the future side
+than the symmetric ±300 s defaults of Kerberos, AWS SigV4 and Stripe
+webhooks. v1 is untouched.
+
+Residual, accepted: a device more than 60 s ahead still fails with the
+generic client error; the rejection is now visible in the server log
+(`rejected … reason=Timestamp: Invalid timestamp` — field errors carry an
+audit reason since this change). Should seamless sync on arbitrarily
+skewed clocks ever be wanted, the recorded follow-up is client clock
+discipline: stamping requests with server-reconciled time taken from the
+`Date` response header.

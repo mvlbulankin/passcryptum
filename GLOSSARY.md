@@ -70,7 +70,9 @@ Two versions ([ADR-0003](docs/adr/0003-protocol-v2.md)): **v1** — symmetric ±
 only. **v2** — requested via the `Protocol-Version: 2` header: signatures
 include the HTTP method and a per-request nonce
 (`method ‖ ts ‖ nonce` / `method ‖ ts ‖ nonce ‖ payload`), the
-window is one-sided `0 ≤ now − ts ≤ 300`, replay protection covers every
+window is one-sided with a 60 s future grace, `−60 ≤ now − ts ≤ 300`
+(ordinary clock drift passes; anything further from the future is still a
+pre-issued request), replay protection covers every
 signed request, and the wire Hashed-Pin is the client-side PBKDF2 (see
 Hashed PIN). The server speaks both; v1 stays for devices with cached older
 shells. Protocol versions are independent of product versions (2.x/3.x).
