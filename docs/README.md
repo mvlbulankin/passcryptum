@@ -27,6 +27,8 @@ root [GLOSSARY](../GLOSSARY.md); work conventions for agents are in
 | [0004](adr/0004-salt-less-origin-derivation.md) | Salt-less origin buffer derivation is accepted deliberately | accepted |
 | [0005](adr/0005-service-worker-updates.md) | App updates are pulled by `registration.update()` on launch; browser soft-updates (≤24 h throttle) are too slow to rely on | accepted |
 | [0006](adr/0006-protocol-v1-retirement.md) | The server speaks one wire protocol: `Protocol-Version: 2` required, v1 serving retired | accepted |
+| [0007](adr/0007-pin-custody.md) | PIN Custody is one module and one owner of the device PIN record | accepted |
+| [0008](adr/0008-per-custody-pin-salt.md) | Each PIN custody owns its own salt: neither hand-over nor revocation can invalidate the other | accepted |
 
 New records: copy the shape of an existing one, number sequentially, and add
 the row above.

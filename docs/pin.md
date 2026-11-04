@@ -34,10 +34,9 @@ to log in and generate passwords, an attacker needs to obtain:
 - Your PIN (it stretches through PBKDF2, so it must be strong — see
   [recommendations](recommendations.md)).
 
-If no random string was ever generated on this device, the key is derived
-from the PIN alone. Setting an online PIN always generates one — and doing
-that on a device that already holds an offline PIN invalidates the offline
-one: set the offline PIN again afterwards.
+Each custody keeps its own random string, so setting the online PIN and
+setting the offline PIN do not interfere: either can be set, changed or
+deleted without touching the other.
 
 In general, only you and nobody but you can possess these resources.
 
