@@ -8,7 +8,7 @@ import {
   isCalculationInProgress,
   runBlocking,
 } from '@/entities/session'
-import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
+import { showPublicKeyError } from '@/shared'
 
 export const useDeleteOnlinePin = () => {
   const dialog = useDialog()

@@ -4,6 +4,8 @@ export * from './lib/clipboard'
 
 export * from './lib/element-ref'
 
+export * from './lib/public-key-error'
+
 export { default as LogoIcon } from './icons/LogoIcon.vue'
 
 export { default as FormSubmit } from './components/FormSubmit.vue'

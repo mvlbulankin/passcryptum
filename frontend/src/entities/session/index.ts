@@ -4,6 +4,8 @@ export * from './lib/enter'
 
 export * from './hooks/exit'
 
+export * from './hooks/sync'
+
 export * from './model/public'
 
 export { session } from './model/private'

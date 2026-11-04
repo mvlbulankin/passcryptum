@@ -12,8 +12,7 @@ import { computed, ref } from 'vue'
 import { MIN_PIN_LENGTH, pinCustody } from '#/core'
 import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
 
-import { FormSubmit } from '@/shared'
-import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
+import { FormSubmit, showPublicKeyError } from '@/shared'
 import { isCalculationInProgress, runBlocking } from '@/entities/session'
 import { session, setPinKind } from '../model'
 

@@ -2,11 +2,10 @@
 import { NButton, useDialog } from 'naive-ui'
 import { CloudUploadOutline } from '@vicons/ionicons5'
 
-import { areServicesEmpty } from '@/entities/session'
-import { useUploadServices } from '../lib/upload-services-to-server'
+import { areServicesEmpty, useVaultSync } from '@/entities/session'
 
 const dialog = useDialog()
-const { uploadServices } = useUploadServices()
+const { uploadServices } = useVaultSync()
 
 const onClick = () => {
   dialog.warning({

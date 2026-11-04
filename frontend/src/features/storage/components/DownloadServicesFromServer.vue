@@ -2,10 +2,9 @@
 import { NButton } from 'naive-ui'
 import { CloudDownloadOutline } from '@vicons/ionicons5'
 
-import { isCalculationInProgress } from '@/entities/session'
-import { useDownloadServices } from '../lib/download-services-from-server'
+import { isCalculationInProgress, useVaultSync } from '@/entities/session'
 
-const { downloadServices } = useDownloadServices()
+const { downloadServices } = useVaultSync()
 
 const onClick = () => {
   downloadServices()

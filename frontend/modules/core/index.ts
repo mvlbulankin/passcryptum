@@ -52,3 +52,14 @@ export type {
 // The Origin Buffer layout is shared by the session and the custody; it
 // lives with the crypto primitives, not in either consumer.
 export { parseOriginBuffer } from './shared'
+
+export { vaultSync, createVaultSync } from './sync'
+
+export type {
+  VaultSync,
+  VaultSyncDevice,
+  SyncReason,
+  PushOutcome,
+  PullOutcome,
+  ClearOutcome,
+} from './sync'

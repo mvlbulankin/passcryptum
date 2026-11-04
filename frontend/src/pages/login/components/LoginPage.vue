@@ -21,9 +21,9 @@ import {
   isCalculationInProgress,
   runBlocking,
   session,
+  useVaultSync,
 } from '@/entities/session'
 import { isOnlineMode, useChangeOnlineMode } from '@/features/online-mode'
-import { useDownloadServices } from '@/features/storage/lib/download-services-from-server'
 
 import LoginForm from './LoginForm.vue'
 
@@ -43,7 +43,7 @@ const hasPin = () =>
 const currentTab = ref(hasPin() ? tabs.PIN : tabs.PASSWORD)
 
 const { toggleOnlineMode } = useChangeOnlineMode()
-const { downloadServices } = useDownloadServices()
+const { downloadServices } = useVaultSync()
 
 const onEnterPin = async (pin: string) => {
   try {

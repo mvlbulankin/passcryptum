@@ -2,10 +2,10 @@
 import { NButton, useDialog } from 'naive-ui'
 import { Close } from '@vicons/ionicons5'
 
-import { useDeleteServices } from '../lib/delete-services-from-server'
+import { useVaultSync } from '@/entities/session'
 
 const dialog = useDialog()
-const { deleteServices } = useDeleteServices()
+const { deleteServices } = useVaultSync()
 
 const onClick = () => {
   dialog.warning({
