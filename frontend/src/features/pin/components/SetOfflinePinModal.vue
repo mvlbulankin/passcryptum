@@ -33,14 +33,22 @@ const onSubmit = () => {
 
   loadingBar.start()
 
-  setOfflinePin(session, localStorage, pin.value).then(() => {
-    touchSession()
-    message.success('Offline PIN has been set')
-    loadingBar.finish()
+  setOfflinePin(session, localStorage, pin.value)
+    .then(() => {
+      touchSession()
+      message.success('Offline PIN has been set')
+      loadingBar.finish()
 
-    isCalculationInProgress.value = false
-    showSetOfflinePinModal.value = false
-  })
+      isCalculationInProgress.value = false
+      showSetOfflinePinModal.value = false
+    })
+    .catch(() => {
+      // The flag must be released on EVERY exit path; a rejected store
+      // otherwise leaves the form locked until a page reload.
+      loadingBar.error()
+      message.error('Failed to set offline PIN')
+      isCalculationInProgress.value = false
+    })
 
   clearForm()
 
