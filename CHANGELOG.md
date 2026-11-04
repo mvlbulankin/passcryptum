@@ -56,10 +56,17 @@ last release).
   decrypted vault, and only the latter asked for confirmation. It now
   copies the encrypted stored text — which pastes back into import — and
   the plaintext form keeps its confirmation.
-- **The offline PIN could stop working.** Setting an online PIN after an
-  offline one re-generated the random string that salts the offline key,
-  leaving the offline blob unreadable (reported as a wrong PIN). The salt
-  is now only persisted when the hand-over succeeds.
+- **The two PIN custodities could break each other.** One random string
+  salted both the offline blob and the online Credential, so setting an
+  online PIN after an offline one re-keyed the offline blob, and revoking
+  the online PIN deleted the salt the offline one needed — both surfaced as
+  a wrong PIN on the correct PIN. A device with only an offline PIN had no
+  salt at all (`docs/pin.md` promised one). Each custody now owns its salt
+  (ADR-0008); **re-enroll the online PIN on each device** — nothing is
+  migrated, since the fleet's PINs were cleared before this release.
+- **PIN flows are covered end to end.** `e2e/pin.spec.ts` drives setting,
+  signing in with, and revoking both custodities through the real UI; no e2e
+  test touched a PIN before, which is how the defect above survived.
 
 ## 3.0.1
 
@@ -76,7 +83,7 @@ last release).
 ### Changed
 
 - Wire 400 rejections are logged (`rejected <method> <path> ip=… pub=…
-  reason=…`), visually distinct from 403 `denied` lines. Previously a
+reason=…`), visually distinct from 403 `denied` lines. Previously a
   timestamp rejection left no trace in the server log, which made the
   clock-skew incident a blind diagnosis.
 
@@ -100,7 +107,7 @@ read.
   Profiles are created by onboarding a public key — there is no registration
   by design; a profile that is not onboarded simply has no server access.
 - **Online mode and PIN storage.** The origin buffer can be stored on the
-  server, encrypted under a PIN; each device gets its own *protector* (a
+  server, encrypted under a PIN; each device gets its own _protector_ (a
   server-issued random secret) and its own credential. Up to 10 credentials
   per profile, oldest evicted first. Offline mode still works exactly as in
   2.x.
