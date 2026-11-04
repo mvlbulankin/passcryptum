@@ -108,6 +108,34 @@ describe('PIN Custody', () => {
       )
     })
 
+    it('writes the salt before the blob, so a failed write cannot fake a PIN', async () => {
+      // The dangerous order is blob-then-salt with the SALT write failing:
+      // the blob lands, its salt never does, and the device reports a PIN
+      // it cannot open. Quota exhaustion in miniature, arranged so the salt
+      // write is the one that fails.
+      const failing = memoryStorage()
+      const original = failing.setItem
+
+      failing.setItem = (key: string, value: string) => {
+        if (key === 'random_string') {
+          throw new Error('QuotaExceededError')
+        }
+
+        original(key, value)
+      }
+
+      const custodyFailing = createPinCustody({
+        storage: failing,
+        wire: fakeWire(),
+      })
+
+      const outcome = await custodyFailing.store('offline', PIN, originBuffer())
+
+      expect(outcome).toEqual({ ok: false, reason: 'unexpected' })
+      expect(custodyFailing.isSet('offline')).toBe(false)
+      expect(failing.dump().has('pin')).toBe(false)
+    })
+
     it('round-trips the Origin Buffer under the PIN', async () => {
       const buffer = originBuffer()
 

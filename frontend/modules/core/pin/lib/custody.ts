@@ -173,12 +173,14 @@ export const createPinCustody = (
 
     try {
       const { iv, key } = await pinAesData(pin, salt)
+      const encrypted = bufferToBase64(await encrypt(iv, key, buffer))
 
-      storage.setItem(
-        LS_KEY_PIN,
-        bufferToBase64(await encrypt(iv, key, buffer)),
-      )
+      // Salt before blob, deliberately. Both writes can fail (storage quota),
+      // and a blob whose salt never landed is unreadable while isSet() still
+      // reports a working PIN — a silent lockout. Salt-first degrades to "no
+      // PIN set", which is the truth and recoverable; the reverse does not.
       storage.setItem(LS_KEY_RANDOM_STRING, salt)
+      storage.setItem(LS_KEY_PIN, encrypted)
       notify()
 
       return { ok: true }
