@@ -19,6 +19,7 @@ import {
   LS_KEY_PIN,
   LS_KEY_PROTECTOR,
   LS_KEY_PUBLIC_KEY,
+  LS_KEY_ONLINE_RANDOM_STRING,
   LS_KEY_RANDOM_STRING,
   ORIGIN_BUFFER_BYTE_LENGTH,
   PIN_BUFFER_BYTE_LENGTH,
@@ -153,7 +154,16 @@ export const createPinCustody = (
   const listeners = new Set<() => void>()
   const notify = () => listeners.forEach(listener => listener())
 
-  const storedRandom = () => storage.getItem(LS_KEY_RANDOM_STRING) ?? ''
+  /**
+   * A custody's salt. Each custody owns one: the offline blob and the online
+   * Credential are sealed independently, so setting, re-setting or revoking
+   * one can never invalidate the other. A device with no salt stored has
+   * none (the PIN alone keys the blob) — see storeOffline.
+   */
+  const saltOf = (kind: CustodyKind) =>
+    storage.getItem(
+      kind === 'online' ? LS_KEY_ONLINE_RANDOM_STRING : LS_KEY_RANDOM_STRING,
+    ) ?? ''
 
   const mode = (): CustodyMode =>
     storage.getItem(LS_KEY_MODE) === 'Online' ? 'online' : 'offline'
@@ -162,13 +172,19 @@ export const createPinCustody = (
     pin: string,
     buffer: ArrayBuffer,
   ): Promise<StoreOutcome> => {
+    // Generated here rather than reused when absent: a device that never set
+    // an online PIN used to encrypt under an empty salt, which `docs/pin.md`
+    // did not mention and which made the PIN the only cost of a guess.
+    const salt = saltOf('offline') || generateRandomString()
+
     try {
-      const { iv, key } = await pinAesData(pin, storedRandom())
+      const { iv, key } = await pinAesData(pin, salt)
 
       storage.setItem(
         LS_KEY_PIN,
         bufferToBase64(await encrypt(iv, key, buffer)),
       )
+      storage.setItem(LS_KEY_RANDOM_STRING, salt)
       notify()
 
       return { ok: true }
@@ -181,13 +197,14 @@ export const createPinCustody = (
     pin: string,
     buffer: ArrayBuffer,
   ): Promise<StoreOutcome> => {
-    // The random string salts the PIN-derived AES key. A fresh one per
-    // hand-over, persisted only on success: a failed hand-over must not
-    // re-salt the key an existing custody depends on.
-    const random = generateRandomString()
+    // The online custody's own salt, distinct from the offline one so the
+    // two cannot invalidate each other. A fresh one per hand-over, persisted
+    // only on success: a failed hand-over must not re-salt the key an
+    // existing custody depends on.
+    const salt = saltOf('online') || generateRandomString()
 
     try {
-      const { iv, key } = await pinAesData(pin, random)
+      const { iv, key } = await pinAesData(pin, salt)
       const encrypted = new Uint8Array(await encrypt(iv, key, buffer))
 
       const { keyPairSeedBuffer } = parseOriginBuffer(buffer)
@@ -202,7 +219,7 @@ export const createPinCustody = (
         encrypted,
       )
 
-      storage.setItem(LS_KEY_RANDOM_STRING, random)
+      storage.setItem(LS_KEY_ONLINE_RANDOM_STRING, salt)
       storage.setItem(LS_KEY_PUBLIC_KEY, uint8ArrayToBase64(publicKey))
       storage.setItem(LS_KEY_PROTECTOR, uint8ArrayToBase64(protector))
       notify()
@@ -221,7 +238,7 @@ export const createPinCustody = (
     }
 
     try {
-      const { iv, key } = await pinAesData(pin, storedRandom())
+      const { iv, key } = await pinAesData(pin, saltOf('offline'))
       const buffer = await decrypt(iv, key, base64ToBuffer(blob))
 
       return { ok: true, buffer }
@@ -253,7 +270,7 @@ export const createPinCustody = (
         base64ToUint8Array(protector),
       )
 
-      const { iv, key } = await pinAesData(pin, storedRandom())
+      const { iv, key } = await pinAesData(pin, saltOf('online'))
       const buffer = await decrypt(iv, key, Uint8Array.from(entropy).buffer)
 
       return { ok: true, buffer }
@@ -300,7 +317,9 @@ export const createPinCustody = (
 
     storage.removeItem(LS_KEY_PROTECTOR)
     storage.removeItem(LS_KEY_PUBLIC_KEY)
-    storage.removeItem(LS_KEY_RANDOM_STRING)
+    // The online salt only. The offline custody's salt is not ours to touch:
+    // deleting it used to silently kill a PIN the user still had set.
+    storage.removeItem(LS_KEY_ONLINE_RANDOM_STRING)
     notify()
 
     return { ok: true }
@@ -324,7 +343,7 @@ export const createPinCustody = (
       return Boolean(
         storage.getItem(LS_KEY_PUBLIC_KEY) &&
         storage.getItem(LS_KEY_PROTECTOR) &&
-        storage.getItem(LS_KEY_RANDOM_STRING),
+        storage.getItem(LS_KEY_ONLINE_RANDOM_STRING),
       )
     },
 

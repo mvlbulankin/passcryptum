@@ -6,6 +6,14 @@ export const LS_KEY_PUBLIC_KEY = 'public_key'
 
 export const LS_KEY_RANDOM_STRING = 'random_string'
 
+// The online custody's own salt. It is deliberately separate from
+// LS_KEY_RANDOM_STRING (the offline salt): a shared salt made the two
+// custodities destroy each other — setting an online PIN re-salted the
+// offline blob, and revoking the online PIN deleted the offline one's salt.
+// The old shared key stays as the offline salt so existing offline blobs keep
+// opening.
+export const LS_KEY_ONLINE_RANDOM_STRING = 'online_random_string'
+
 export const PIN_BUFFER_BYTE_LENGTH = 48
 
 export const PIN_BUFFER_ITERATIONS = 2 ** 19

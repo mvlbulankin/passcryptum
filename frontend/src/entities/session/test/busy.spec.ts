@@ -18,6 +18,34 @@ const recordingBar = (): Bar & { calls: string[] } => {
 }
 
 describe('runBlocking', () => {
+  it('keeps the flag and the bar up while operations overlap', async () => {
+    // Two user actions in quick succession are not nested; the shorter one
+    // finishing must not end the longer one's wait.
+    const bar = recordingBar()
+
+    let releaseSlow = () => undefined as void
+
+    const slow = runBlocking(
+      () =>
+        new Promise<void>(resolve => {
+          releaseSlow = resolve
+        }),
+      bar,
+    )
+
+    const fast = runBlocking(() => 'quick', bar)
+
+    await fast
+    expect(isCalculationInProgress.value).toBe(true)
+    expect(bar.calls).toEqual(['start'])
+
+    releaseSlow()
+    await slow
+
+    expect(isCalculationInProgress.value).toBe(false)
+    expect(bar.calls).toEqual(['start', 'finish'])
+  })
+
   it('holds the flag while the action runs', async () => {
     expect(isCalculationInProgress.value).toBe(false)
 

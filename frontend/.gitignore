@@ -3,3 +3,7 @@ dist
 .DS_Store
 .idea
 .vscode/*
+
+# Playwright artefacts (traces, videos, failure screenshots)
+test-results/
+playwright-report/

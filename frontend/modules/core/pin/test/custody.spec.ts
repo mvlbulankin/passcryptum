@@ -90,6 +90,24 @@ describe('PIN Custody', () => {
   })
 
   describe('offline custody', () => {
+    it('generates its own salt, so the PIN is never the only cost of a guess', async () => {
+      // Before the salt split, an offline-only device encrypted under an
+      // empty salt: one PBKDF2 per guess and no per-device uniqueness.
+      await custody.store('offline', PIN, originBuffer())
+
+      expect(storage.dump().get('random_string')).toBeTruthy()
+
+      const second = memoryStorage()
+      const other = createPinCustody({ storage: second, wire: fakeWire() })
+
+      await other.store('offline', PIN, originBuffer())
+
+      // Per device, not a constant.
+      expect(second.dump().get('random_string')).not.toBe(
+        storage.dump().get('random_string'),
+      )
+    })
+
     it('round-trips the Origin Buffer under the PIN', async () => {
       const buffer = originBuffer()
 
@@ -199,7 +217,7 @@ describe('PIN Custody', () => {
       // First hand-over succeeds and salts the key with a random string.
       await custody.store('online', PIN, originBuffer())
 
-      const random = storage.dump().get('random_string')
+      const random = storage.dump().get('online_random_string')
 
       // A second hand-over fails at the server.
       const refused = createPinCustody({
@@ -213,7 +231,7 @@ describe('PIN Custody', () => {
       await refused.store('online', 'another pin', originBuffer())
 
       // The salt is untouched, so the first custody still releases.
-      expect(storage.dump().get('random_string')).toBe(random)
+      expect(storage.dump().get('online_random_string')).toBe(random)
 
       custody.setMode('online')
 
@@ -225,7 +243,7 @@ describe('PIN Custody', () => {
 
       expect(await custody.revoke('online')).toEqual({ ok: true })
       expect(custody.isSet('online')).toBe(false)
-      expect(storage.dump().has('random_string')).toBe(false)
+      expect(storage.dump().has('online_random_string')).toBe(false)
     })
 
     it('answers unknownCredential when the credential is already gone', async () => {
@@ -245,6 +263,45 @@ describe('PIN Custody', () => {
       })
       // The device record survives a failed revoke, as before.
       expect(gone.isSet('online')).toBe(true)
+    })
+  })
+
+  describe('the two custodities do not invalidate each other', () => {
+    // The salts are per-custody precisely so that these three sequences keep
+    // working. With one shared salt each of them silently broke a PIN the
+    // user still had set.
+    it('setting an online PIN leaves an existing offline PIN working', async () => {
+      const buffer = originBuffer()
+
+      await custody.store('offline', PIN, buffer)
+      await custody.store('online', PIN, buffer)
+
+      custody.setMode('offline')
+      expect(await custody.release(PIN)).toEqual({ ok: true, buffer })
+    })
+
+    it('setting an offline PIN leaves an existing online PIN working', async () => {
+      const buffer = originBuffer()
+
+      await custody.store('online', PIN, buffer)
+      await custody.store('offline', PIN, buffer)
+
+      custody.setMode('online')
+      expect(await custody.release(PIN)).toEqual({ ok: true, buffer })
+    })
+
+    it('revoking the online custody leaves the offline PIN working', async () => {
+      const buffer = originBuffer()
+
+      await custody.store('online', PIN, buffer)
+      await custody.store('offline', PIN, buffer)
+
+      expect(await custody.revoke('online')).toEqual({ ok: true })
+      // The offline custody is untouched — the online salt is not its salt.
+      expect(custody.isSet('offline')).toBe(true)
+
+      custody.setMode('offline')
+      expect(await custody.release(PIN)).toEqual({ ok: true, buffer })
     })
   })
 

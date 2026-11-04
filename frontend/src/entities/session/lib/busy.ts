@@ -9,10 +9,12 @@ import { computed, readonly, ref } from 'vue'
 // here now: `runBlocking` is the only writer, and it cannot skip its exit
 // path.
 
-const depth = ref(0)
+const inFlight = ref(0)
 
 /** True while any blocking operation is in flight. Never write to it. */
-export const isCalculationInProgress = readonly(computed(() => depth.value > 0))
+export const isCalculationInProgress = readonly(
+  computed(() => inFlight.value > 0),
+)
 
 /** The part of naive-ui's loading bar `runBlocking` drives. */
 export type Bar = {
@@ -24,23 +26,22 @@ export type Bar = {
 /**
  * Runs an operation with the busy flag held (and the loading bar shown).
  *
- * Nested calls are safe: the flag is released when the outermost operation
- * finishes, so an inner action cannot clear the flag an outer one still
- * needs. The bar is driven by the outermost operation too — one bar for one
- * user-visible wait, not one per nested call.
+ * Nested calls release the flag only when the outermost one finishes, so an
+ * inner action cannot clear a wait an outer one still needs. Both the flag
+ * and the bar are reference-counted — an overlapping operation started by
+ * the user (two menu actions in quick succession) must not end the other's
+ * wait early.
  *
- * Errors are rethrown: the flag is always released, and the caller keeps
- * the choice of what to show.
+ * Errors are rethrown: the flag is always released, and the caller keeps the
+ * choice of what to show.
  */
 export const runBlocking = async <T>(
   action: () => T | Promise<T>,
   bar?: Bar,
 ): Promise<T> => {
-  const outer = depth.value === 0
+  inFlight.value += 1
 
-  depth.value += 1
-
-  if (outer) {
+  if (inFlight.value === 1) {
     bar?.start()
   }
 
@@ -53,9 +54,9 @@ export const runBlocking = async <T>(
 
     throw e
   } finally {
-    depth.value -= 1
+    inFlight.value -= 1
 
-    if (depth.value === 0) {
+    if (inFlight.value === 0) {
       if (failed) {
         bar?.error()
       } else {
