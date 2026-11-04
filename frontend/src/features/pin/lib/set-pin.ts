@@ -1,9 +1,9 @@
-import { showSetOnlinePinModal, showSetOfflinePinModal } from '../model'
+import { setPinKind } from '../model'
 
 export const setOnlinePin = () => {
-  showSetOnlinePinModal.value = true
+  setPinKind.value = 'online'
 }
 
 export const setOfflinePin = () => {
-  showSetOfflinePinModal.value = true
+  setPinKind.value = 'offline'
 }

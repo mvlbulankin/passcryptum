@@ -1,7 +1,7 @@
-export * from './lib/set-pin'
+export { session } from './model'
 
-export * from './hooks/delete-pin'
+export { setOnlinePin, setOfflinePin } from './lib/set-pin'
 
-export { default as SetOfflinePinModal } from './components/SetOfflinePinModal.vue'
+export { useDeleteOnlinePin, useDeleteOfflinePin } from './hooks/delete-pin'
 
-export { default as SetOnlinePinModal } from './components/SetOnlinePinModal.vue'
+export { default as SetPinModal } from './components/SetPinModal.vue'

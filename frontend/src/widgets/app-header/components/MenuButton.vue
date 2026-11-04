@@ -21,8 +21,7 @@ import {
   useDeleteOfflinePin,
   setOnlinePin,
   setOfflinePin,
-  SetOnlinePinModal,
-  SetOfflinePinModal,
+  SetPinModal,
 } from '@/features/pin'
 import { addService, AddServiceModal } from '@/features/add-service'
 import { useExit, isCalculationInProgress } from '@/entities/session'
@@ -183,8 +182,7 @@ const handleSelect = (key: string) => {
     </NButton>
   </NDropdown>
 
-  <SetOfflinePinModal />
-  <SetOnlinePinModal />
+  <SetPinModal />
   <StorageDrawer />
   <AddServiceModal />
 </template>

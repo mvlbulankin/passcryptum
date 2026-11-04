@@ -8,14 +8,14 @@ import {
   useMessage,
   useLoadingBar,
 } from 'naive-ui'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { MIN_PIN_LENGTH, pinCustody } from '#/core'
 import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
 
 import { FormSubmit } from '@/shared'
 import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
 import { isCalculationInProgress } from '@/entities/session'
-import { session, showSetOnlinePinModal } from '../model'
+import { session, setPinKind } from '../model'
 
 const pin = ref('')
 
@@ -23,23 +23,51 @@ const dialog = useDialog()
 const message = useMessage()
 const loadingBar = useLoadingBar()
 
+// The one set-PIN form; the kind decides the title, the texts and how a
+// refusal is explained. The twins it replaces had already drifted apart
+// (one hardened its failure paths, the other did not).
+const kind = computed(() => setPinKind.value)
+
+const isOnline = computed(() => kind.value === 'online')
+
+const title = computed(() =>
+  isOnline.value ? 'Setting online PIN' : 'Setting offline PIN',
+)
+
+const successText = computed(() =>
+  isOnline.value ? 'Online PIN has been set' : 'Offline PIN has been set',
+)
+
+const show = computed({
+  get: () => kind.value !== null,
+  set(next: boolean) {
+    if (!next) {
+      setPinKind.value = null
+    }
+  },
+})
+
 const clearForm = () => {
   pin.value = ''
 }
 
-const stop = () => {
-  loadingBar.finish()
+const stop = (failed: boolean) => {
+  if (failed) {
+    loadingBar.error()
+  } else {
+    loadingBar.finish()
+  }
+
   isCalculationInProgress.value = false
 }
 
 const fail = () => {
-  loadingBar.error()
-  message.error('Failed to set online PIN')
-  isCalculationInProgress.value = false
+  message.error(`Failed to set ${isOnline.value ? 'online' : 'offline'} PIN`)
+  stop(true)
 }
 
 const onSubmit = () => {
-  if (pin.value.length < MIN_PIN_LENGTH) {
+  if (pin.value.length < MIN_PIN_LENGTH || kind.value === null) {
     message.error(`PIN must be at least ${MIN_PIN_LENGTH} characters`)
 
     return
@@ -49,15 +77,17 @@ const onSubmit = () => {
   isCalculationInProgress.value = true
 
   pinCustody
-    .store('online', pin.value, session.originBuffer())
+    .store(kind.value, pin.value, session.originBuffer())
     .then(result => {
       if (result.ok) {
-        message.success('Online PIN has been set')
-        stop()
-        showSetOnlinePinModal.value = false
+        message.success(successText.value)
+        stop(false)
+        setPinKind.value = null
         clearForm()
       } else if (result.reason === 'unknownProfile') {
-        stop()
+        // Only the online hand-over can be refused this way, and only it
+        // explains the refusal with the public-key dialog.
+        stop(false)
         showPublicKeyError(dialog)
       } else {
         fail()
@@ -69,10 +99,10 @@ const onSubmit = () => {
 
 <template>
   <NModal
-    v-model:show="showSetOnlinePinModal"
+    v-model:show="show"
     preset="card"
     class="app-modal"
-    title="Setting online PIN"
+    :title="title"
     @after-leave="clearForm"
   >
     <form @submit.prevent="onSubmit">
