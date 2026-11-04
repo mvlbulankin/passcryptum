@@ -16,21 +16,21 @@ describe('Origin Buffer layout', () => {
     expect(parsed.id).toHaveLength(4)
     expect(parsed.lsKey).toHaveLength(16)
     expect(parsed.entropy.byteLength).toBe(112)
-    expect(parsed.iv.byteLength).toBe(16)
     expect(parsed.keyPairSeedBuffer.byteLength).toBe(32)
     expect(parsed.secretBoxIvBuffer.byteLength).toBe(24)
     expect(parsed.secretBoxKeyBuffer.byteLength).toBe(32)
     expect(parsed.cryptoKeyBuffer.byteLength).toBe(32)
 
-    // The slices cover the buffer exactly, with no gaps or overlap.
+    // The slices cover the buffer exactly, with no gaps or overlap —
+    // except the 16 reserved bytes at 120–136: the retired pre-3.0 blob IV
+    // slice (ADR-0009), kept reserved so no other range shifts.
     const total =
       parsed.entropy.byteLength +
-      parsed.iv.byteLength +
       parsed.keyPairSeedBuffer.byteLength +
       parsed.secretBoxIvBuffer.byteLength +
       parsed.secretBoxKeyBuffer.byteLength +
       parsed.cryptoKeyBuffer.byteLength
 
-    expect(total).toBe(256 - 8)
+    expect(total).toBe(256 - 8 - 16)
   })
 })

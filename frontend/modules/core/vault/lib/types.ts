@@ -8,8 +8,6 @@ import type { ServicesConfig } from '../../../services/types'
 export type VaultSession = {
   lsKey: string
   cryptoKey: CryptoKey
-  /** The origin buffer's IV slice, for reading pre-3.0 (static-IV) blobs. */
-  legacyIv: ArrayBuffer
 }
 
 /** The slice of Web Storage the vault uses. localStorage satisfies it. */

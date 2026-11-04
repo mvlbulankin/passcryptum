@@ -40,11 +40,7 @@ export const createVault = (
     let services: ServicesConfig | null
 
     try {
-      services = await readServices(
-        fromHex(hex),
-        session.cryptoKey,
-        session.legacyIv,
-      )
+      services = await readServices(fromHex(hex), session.cryptoKey)
     } catch {
       services = null
     }
@@ -94,7 +90,7 @@ export const createVault = (
   ): Promise<ServicesConfig | null> => {
     assertOpen()
 
-    return readServices(bytes, session.cryptoKey, session.legacyIv)
+    return readServices(bytes, session.cryptoKey)
   }
 
   const importText = async (text: string): Promise<ServicesConfig | null> => {
@@ -109,11 +105,7 @@ export const createVault = (
     }
 
     try {
-      return await readServices(
-        fromHex(text.trim()),
-        session.cryptoKey,
-        session.legacyIv,
-      )
+      return await readServices(fromHex(text.trim()), session.cryptoKey)
     } catch {
       return null
     }

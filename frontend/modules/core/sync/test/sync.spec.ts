@@ -99,11 +99,7 @@ const device = (vault: Vault): VaultSyncDevice => ({
 // fresh key.
 const makeVault = async (key: CryptoKey): Promise<Vault> => {
   return createVault(
-    {
-      lsKey: 'test-vault',
-      cryptoKey: key,
-      legacyIv: crypto.getRandomValues(new Uint8Array(16)).buffer,
-    },
+    { lsKey: 'test-vault', cryptoKey: key },
     memoryStorage(),
   )
 }

@@ -8,8 +8,9 @@ A 256-byte block, the source of all of the user's cryptographic material:
 the Ed25519 key pair seed, the secret box key, the AES key, and the password
 generation entropy. Unlocked by a PIN via PBKDF2. Stored on the user's
 device; never sent to the server. IVs are not taken from the buffer — each
-record gets a fresh random IV; legacy blobs with a static IV are still
-readable.
+record gets a fresh random IV; the bytes that once held the pre-3.0 static
+IV are reserved, and the format that used them is retired
+([ADR-0009](docs/adr/0009-legacy-blob-retirement.md)).
 
 ## PIN Custody
 
@@ -60,9 +61,10 @@ synchronized between the user's devices.
 
 ## Vault
 
-Services as they live on the device: one encrypted blob (the current format
-carries a marker and a fresh IV per save; pre-3.0 blobs with a static IV are
-still readable), plus everything about how it is stored, exported to a file
+Services as they live on the device: one encrypted blob (a marker and a
+fresh IV per save — the only format; the pre-3.0 static-IV format was
+retired by [ADR-0009](docs/adr/0009-legacy-blob-retirement.md)), plus
+everything about how it is stored, exported to a file
 and imported back. The Vault owns the format; the Wire Protocol only carries
 the bytes between devices.
 

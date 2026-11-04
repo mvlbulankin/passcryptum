@@ -4,6 +4,19 @@ All notable changes to Passcryptum. This project continues
 [nelkor/passcryptum](https://github.com/nelkor/passcryptum) (v2.1.4 was its
 last release).
 
+## 3.2.0
+
+### Removed
+
+- **The pre-3.0 vault blob format is retired**
+  ([ADR-0009](docs/adr/0009-legacy-blob-retirement.md)). Since 3.0 every
+  save writes `marker ‖ fresh IV ‖ AES-CBC`; the reader no longer accepts
+  the old raw AES-CBC blobs encrypted under a static IV sliced from the
+  origin buffer. Devices and exports already on 3.0 are unaffected. A
+  pre-3.0 blob now reads as unreadable — the vault drops it — so recover
+  one with a pre-3.0 build or a plaintext export before updating if it
+  still matters.
+
 ## 3.1.0
 
 ### Changed

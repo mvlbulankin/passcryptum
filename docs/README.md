@@ -29,6 +29,7 @@ root [GLOSSARY](../GLOSSARY.md); work conventions for agents are in
 | [0006](adr/0006-protocol-v1-retirement.md) | The server speaks one wire protocol: `Protocol-Version: 2` required, v1 serving retired | accepted |
 | [0007](adr/0007-pin-custody.md) | PIN Custody is one module and one owner of the device PIN record | accepted |
 | [0008](adr/0008-per-custody-pin-salt.md) | Each PIN custody owns its own salt: neither hand-over nor revocation can invalidate the other | accepted |
+| [0009](adr/0009-legacy-blob-retirement.md) | The pre-3.0 vault blob format is retired; one format, fresh IV per save | accepted |
 
 New records: copy the shape of an existing one, number sequentially, and add
 the row above.

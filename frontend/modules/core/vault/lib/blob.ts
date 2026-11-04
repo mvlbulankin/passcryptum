@@ -1,17 +1,12 @@
 import { parse, stringify, type ServicesConfig } from '../../../services'
 
-// The blob format. Current:
+// The blob format — the only one (ADR-0009):
 //
 //   0x01 ‖ fresh IV(16) ‖ AES-CBC(json)
 //
-// Pre-3.0 (legacy): raw AES-CBC(json) under a static IV sliced from the
-// origin buffer.
-//
-// The two are told apart structurally, not by guessing: a CBC ciphertext is
-// always a multiple of 16 bytes, while the current blob is
-// 1 + 16 + 16k ≡ 1 (mod 16). The sets cannot overlap — a legacy blob whose
-// first byte happens to be 0x01 is still rejected by the length check
-// (measured: ~0.29% of legacy blobs start with that byte).
+// The pre-3.0 format (raw AES-CBC under a static IV sliced from the origin
+// buffer) is retired: a byte sequence that is a multiple of 16 is not a
+// blob and is rejected without decrypting.
 
 export const BLOB_MARKER = 0x01
 
@@ -50,7 +45,7 @@ export const encryptBlob = async (
   return new Uint8Array([BLOB_MARKER, ...iv, ...new Uint8Array(cipher)]).buffer
 }
 
-const isCurrentFormat = (buffer: ArrayBuffer): boolean => {
+const isBlobFormat = (buffer: ArrayBuffer): boolean => {
   const bytes = new Uint8Array(buffer)
 
   return (
@@ -61,24 +56,24 @@ const isCurrentFormat = (buffer: ArrayBuffer): boolean => {
 }
 
 /**
- * Decrypts a blob in either format. Returns null when the bytes are not a
- * blob this vault can read. Validity of the *content* is the caller's
- * concern: this function only answers "can these bytes be decrypted".
+ * Decrypts a blob. Returns null when the bytes are not a blob this vault
+ * can read: wrong format or undecryptable ciphertext. Validity of the
+ * *content* is the caller's concern: this function only answers "can these
+ * bytes be decrypted".
  */
 export const decryptBlob = async (
   buffer: ArrayBuffer,
   key: CryptoKey,
-  legacyIv: ArrayBuffer,
 ): Promise<string | null> => {
-  const current = isCurrentFormat(buffer)
-  const cipher = current ? buffer.slice(1 + IV_LENGTH) : buffer
-  const iv = current ? buffer.slice(1, 1 + IV_LENGTH) : legacyIv
+  if (!isBlobFormat(buffer)) {
+    return null
+  }
 
   try {
     const plain = await crypto.subtle.decrypt(
-      { name: 'AES-CBC', iv },
+      { name: 'AES-CBC', iv: buffer.slice(1, 1 + IV_LENGTH) },
       key,
-      cipher,
+      buffer.slice(1 + IV_LENGTH),
     )
 
     return new TextDecoder().decode(plain)
@@ -91,9 +86,8 @@ export const decryptBlob = async (
 export const readServices = async (
   buffer: ArrayBuffer,
   key: CryptoKey,
-  legacyIv: ArrayBuffer,
 ): Promise<ServicesConfig | null> => {
-  const plaintext = await decryptBlob(buffer, key, legacyIv)
+  const plaintext = await decryptBlob(buffer, key)
 
   if (plaintext === null) {
     return null

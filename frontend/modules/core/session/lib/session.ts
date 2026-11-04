@@ -67,10 +67,7 @@ export const createSession = (deps: SessionDeps = {}): Session => {
     const keyPairSeed = new Uint8Array(parsed.keyPairSeedBuffer)
     const cryptoKey = await createAesKey(parsed.cryptoKeyBuffer)
 
-    const vault = createVault(
-      { lsKey: parsed.lsKey, cryptoKey, legacyIv: parsed.iv },
-      storage,
-    )
+    const vault = createVault({ lsKey: parsed.lsKey, cryptoKey }, storage)
 
     state = {
       originBuffer: buffer,

@@ -22,7 +22,6 @@ const session = async (): Promise<VaultSession> => {
   return {
     lsKey: 'test-vault',
     cryptoKey: key,
-    legacyIv: crypto.getRandomValues(new Uint8Array(16)).buffer,
   }
 }
 
@@ -80,76 +79,30 @@ describe('Vault', () => {
     expect(storage.dump()).toEqual({})
   })
 
-  // The format is dispatched by structure, not by guessing: a legacy blob is
-  // raw AES-CBC (length % 16 === 0), the current one is
-  // 0x01 ‖ IV(16) ‖ ciphertext (length % 16 === 1). The sets cannot overlap.
-  it('reads a legacy (static-IV) blob', async () => {
-    const s = shared
-    const legacyVault = createVault(s, storage)
-
+  // ADR-0009: the pre-3.0 format (raw AES-CBC, a multiple of 16 bytes,
+  // no marker, no IV) is retired. Whatever IV such bytes were encrypted
+  // under, they are not a blob this vault can read, so read() drops them
+  // like any other unreadable content.
+  it('drops a pre-3.0 (static-IV) blob as unreadable', async () => {
     const plaintext = new TextEncoder().encode(
       JSON.stringify({ 'github.com': [7, { me: 0 }] }),
     )
 
     const cipher = await crypto.subtle.encrypt(
-      { name: 'AES-CBC', iv: s.legacyIv },
-      s.cryptoKey,
+      { name: 'AES-CBC', iv: crypto.getRandomValues(new Uint8Array(16)) },
+      shared.cryptoKey,
       plaintext,
     )
 
     storage.setItem(
-      s.lsKey,
+      shared.lsKey,
       Array.from(new Uint8Array(cipher))
         .map(n => n.toString(16).padStart(2, '0'))
         .join(''),
     )
 
-    expect((await legacyVault.read()) as unknown[]).toHaveLength(1)
-  })
-
-  it('dispatches legacy by length, not by the marker byte', async () => {
-    const s = shared
-    const { decryptBlob } = await import('../lib/blob')
-
-    // A valid legacy blob (raw AES-CBC: length 16k) whose ciphertext happens
-    // to start with the marker byte. Search over the plaintext: CBC gives
-    // C1 = E(P1 ⊕ IV), so varying P1 varies C1.
-    const iv = new Uint8Array(s.legacyIv.slice(0))
-
-    let legacy: ArrayBuffer | null = null
-
-    for (let candidate = 0; candidate < 8192 && !legacy; candidate++) {
-      const json = JSON.stringify({ k: candidate })
-      const padded = new Uint8Array(Math.ceil(json.length / 16) * 16)
-
-      padded.set(new TextEncoder().encode(json))
-
-      const cipher = await crypto.subtle.encrypt(
-        { name: 'AES-CBC', iv },
-        s.cryptoKey,
-        padded,
-      )
-
-      if (new Uint8Array(cipher)[0] === 0x01 && cipher.byteLength % 16 === 0) {
-        legacy = cipher
-      }
-    }
-
-    expect(legacy, 'marker-colliding legacy ciphertext found').not.toBeNull()
-    expect(new Uint8Array(legacy!)[0]).toBe(0x01)
-    // The new format is 1 + 16 + 16k; this is 16k, so it cannot be confused.
-    expect(legacy!.byteLength % 16).toBe(0)
-
-    const plaintext = await decryptBlob(
-      legacy as ArrayBuffer,
-      s.cryptoKey,
-      s.legacyIv,
-    )
-
-    // Decrypted as legacy despite the marker byte: length ruled the new
-    // format out before the marker was consulted.
-    expect(plaintext).not.toBeNull()
-    expect(plaintext?.startsWith('{"k":')).toBe(true)
+    expect(await vault.read()).toBeNull()
+    expect(storage.dump()).toEqual({})
   })
 
   it('exports bytes that importBytes reads back', async () => {
