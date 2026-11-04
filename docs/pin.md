@@ -23,15 +23,21 @@ origin password and set a new PIN.
 
 ## How it works
 
-Your origin buffer is encrypted locally with a synchronous algorithm whose key
-devices from two components: a random string and your PIN.
-The encrypted buffer is stored on your device. It means that in order
+Your origin buffer is encrypted locally with a symmetric algorithm whose key
+is derived from two components: a random string and your PIN. The random
+string is generated when the PIN is set and stored next to the encrypted
+buffer, on your device — never on a server. It means that in order
 to log in and generate passwords, an attacker needs to obtain:
 
 - The encrypted text saved on your device;
 - The random string stored next to it;
 - Your PIN (it stretches through PBKDF2, so it must be strong — see
   [recommendations](recommendations.md)).
+
+If no random string was ever generated on this device, the key is derived
+from the PIN alone. Setting an online PIN always generates one — and doing
+that on a device that already holds an offline PIN invalidates the offline
+one: set the offline PIN again afterwards.
 
 In general, only you and nobody but you can possess these resources.
 

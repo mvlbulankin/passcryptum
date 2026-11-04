@@ -26,14 +26,21 @@ Feature-Sliced layout:
 
 - `modules/` — reusable, UI-framework-light layers:
   - `modules/core/` — all cryptography: session (origin buffer), PIN
-    handling, vault (the encrypted local blob), **wire/** — the Wire
-    Protocol client, the only place the app talks to the server;
+    Custody (holding the Origin Buffer under a PIN, online or offline),
+    vault (the encrypted local blob), sync (pushing/pulling the vault),
+    **wire/** — the Wire Protocol client, the only place the app talks to
+    the server;
   - `modules/services/` — pure functions over the services config
     (parse/stringify/merge).
 - `src/` — application layers: `entities/`, `features/`, `widgets/`,
   `pages/`, `app/` (FSD).
 
+Imports cross two seams only: `#/core` (barrel, enforced by
+`modules/core/test/barrel.spec.ts`) and `@/entities/session` +
+feature-to-feature (enforced by `src/entities/session/test/seams.spec.ts`).
+
 Path aliases: `#/` → `modules/`, `@/` → `src/`.
 
-Domain terms (Origin Buffer, Profile, Credential, Protector, Entropy,
-Wire Protocol) are defined in the root `GLOSSARY.md`.
+Domain terms (Origin Buffer, PIN Custody, Profile, Credential, Protector,
+Entropy, Hashed PIN, Services, Vault, Wire Protocol) are defined in the root
+`GLOSSARY.md`.

@@ -9,8 +9,9 @@ frontend, and owns the SQLite file. See ADR-0001 for the architecture.
 - `internal/wire/` — the Wire Protocol: per-endpoint recipes and the shared
   request pipeline (headers, timestamp window, signatures, replay);
   see ADR-0002/0003.
-- `internal/guard/` — in-memory security state: per-IP rate limiting, POST
-  replay cache, per-profile credential lockout.
+- `internal/guard/` — in-memory security state: per-IP rate limiting, the
+  replay cache (every signed request, GET/DELETE included), per-profile
+  credential lockout.
 - `internal/store/` — all SQL: profiles and credentials, PBKDF2 pin
   re-hash on write.
 - `server.go` — endpoints as recipe values + domain logic; static SPA.

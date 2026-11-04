@@ -17,6 +17,50 @@ last release).
   replay protection are unchanged. The documentation now describes the one
   protocol without version history.
 
+- **PIN Custody is one module.** Holding the Origin Buffer under a PIN —
+  online as a Credential, offline as an encrypted blob — was spread over
+  four layers (`actions/`, `pin/`, `session/`, two near-identical modals).
+  It is now `modules/core/pin`: `store` / `release` / `revoke` / `isSet` /
+  `mode`, with the KDFs, the device-side key record and the Credential
+  calls behind it. The term is in `GLOSSARY.md`.
+
+- **Failure reasons reach the user.** A network outage during online PIN
+  login used to be reported as "Wrong PIN": every layer collapsed the wire
+  client's error kinds and the login page overwrote whatever was left.
+  PIN Custody returns a closed set of reasons and the form shows the real
+  one.
+
+- **One owner for the busy flag and the loading bar.** `runBlocking`
+  replaces 12 manual flag writes across 5 files and 17 hand-paired
+  loading-bar calls. The three components whose `.then()` had no `.catch()`
+  can no longer leave the login form disabled until a page reload.
+
+- **Vault sync is a module.** Pushing and pulling the Vault — the
+  zero-knowledge envelope and the merge policy — moved out of two UI hooks
+  into `modules/core/sync` (`push` / `pull` / `clear`). Pulling merges with
+  what the device holds instead of overwriting it.
+
+- **The Wire Protocol's recipe is one description.** On the backend the
+  nonce requirement is derived from the recipe rather than declared beside
+  it, and `NeedsProfile` is enforced by the pipeline instead of the mux. On
+  the frontend an endpoint table drives one request builder instead of six
+  hand-written closures. No wire bytes changed: the contract suite pins it.
+
+- `entities/session` and cross-feature imports are guarded mechanically,
+  the same way `modules/core` already was.
+
+### Fixed
+
+- **"Copy storage text" copied plaintext.** It claimed to copy the stored
+  blob but shared its body with "Copy without encryption": both read the
+  decrypted vault, and only the latter asked for confirmation. It now
+  copies the encrypted stored text — which pastes back into import — and
+  the plaintext form keeps its confirmation.
+- **The offline PIN could stop working.** Setting an online PIN after an
+  offline one re-generated the random string that salts the offline key,
+  leaving the offline blob unreadable (reported as a wrong PIN). The salt
+  is now only persisted when the hand-over succeeds.
+
 ## 3.0.1
 
 ### Fixed

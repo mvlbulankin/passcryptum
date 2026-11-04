@@ -1,5 +1,6 @@
 // Package guard owns the in-memory security state of the server: per-IP rate
-// limiting, POST replay rejection, and per-profile credential lockout. All
+// limiting, replay rejection for every signed request (GET and DELETE
+// included — ADR-0003), and per-profile credential lockout. All
 // state is process-local and lost on restart by design.
 //
 // The clock is injected: tests drive windows and expiry with fake time
@@ -19,7 +20,7 @@ const lockoutWindow = 10 * time.Minute
 
 type Guard struct {
 	mu       sync.Mutex
-	seenSigs map[string]time.Time // POST replay cache: pub|sig -> expiry
+	seenSigs map[string]time.Time // replay cache: pub|sig -> expiry
 	ipHits   map[string][]time.Time
 	failures map[string][]time.Time // per-profile failed credential auths
 
@@ -29,7 +30,7 @@ type Guard struct {
 	now             func() time.Time
 }
 
-// New builds a Guard. replayTTL is how long a seen POST signature stays
+// New builds a Guard. replayTTL is how long a seen signature stays
 // cached (the server passes twice the wire timestamp window: a resubmission
 // older than that cannot satisfy the window anyway). The clock is injected
 // so tests drive windows and expiry with fake time.

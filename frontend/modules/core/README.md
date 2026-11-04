@@ -17,6 +17,7 @@ application actually uses; everything else is an implementation detail, and
 | `vault/`       | Services as stored on the device: one encrypted blob, its format, export to a file and import back |
 | `wire/`        | the Wire Protocol client — the only way the app talks to the server                                |
 | `pin/`         | PIN Custody: holding the Origin Buffer under a PIN, online or offline (GLOSSARY)                   |
+| `sync/`        | pushing and pulling the Vault: the zero-knowledge envelope and the merge policy                    |
 | `generator/`   | service password derivation from Entropy                                                           |
 | `shared/`      | crypto/encoding primitives and the Origin Buffer layout                                            |
 | `constants.ts` | protocol and storage constants (iterations, key names, minimum PIN length)                         |
@@ -86,8 +87,24 @@ wire.getEntropy(...) / createCredential(...) / deleteCredential(...)
 ```
 
 Each function is one Wire Protocol endpoint; framing, signing, nonce and
-version headers are internal. Failures are `WireError` with a `kind`;
+version headers are internal — an endpoint table drives one request builder.
+Failures are `WireError` with a `kind`;
 `isForbidden(e)` answers the one case the UI treats specially.
+
+## Synchronising the Vault
+
+```ts
+vaultSync.push(device) / pull(device) / clear(device)
+```
+
+`device` is what a device contributes: `keyPairSeed`, `transportKeys()`,
+`vault`, and `apply(services)`. The zero-knowledge envelope (vault bytes
+wrapped in the session's secretbox keys) and the merge policy — pulling
+merges with what the device holds instead of overwriting it — are the
+module's business. Outcomes are a closed vocabulary
+(`pushed`/`nothingToPush`, `pulled`/`nothingOnServer`/`corrupt`/
+`emptyAfterMerge`, `cleared`/`alreadyEmpty`, plus `unknownProfile`,
+`network`, `unexpected`).
 
 ## Subscribing to state
 
