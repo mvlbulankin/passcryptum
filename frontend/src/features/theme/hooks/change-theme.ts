@@ -3,6 +3,7 @@ import { useLoadingBar } from 'naive-ui'
 
 import { setTheme } from '@/dom'
 import { DROPDOWN_TIMEOUT } from '@/shared'
+import { runBlocking } from '@/entities/session'
 import { isDarkTheme } from '../model'
 import { lsKey, themeVariants } from '../constants'
 
@@ -14,14 +15,18 @@ export const useChangeTheme = () => {
   )
 
   const changeTheme = () => {
-    loadingBar.start()
-    localStorage.setItem(lsKey, themeName.value)
+    void runBlocking(
+      () =>
+        new Promise<void>(resolve => {
+          localStorage.setItem(lsKey, themeName.value)
 
-    setTimeout(() => {
-      isDarkTheme.value = !isDarkTheme.value
-
-      loadingBar.finish()
-    }, DROPDOWN_TIMEOUT)
+          setTimeout(() => {
+            isDarkTheme.value = !isDarkTheme.value
+            resolve()
+          }, DROPDOWN_TIMEOUT)
+        }),
+      loadingBar,
+    )
   }
 
   watch(isDarkTheme, setTheme, { immediate: true })

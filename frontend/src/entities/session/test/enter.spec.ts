@@ -1,81 +1,52 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { PinReleaseError } from '#/core'
+import { webcrypto } from 'crypto'
 
-// The session core is heavy (PBKDF2, storage); this pins the FLAG discipline
-// of the app-level entry point: whichever way the attempt ends, the
-// "calculation in progress" flag must be released — otherwise the login form
-// stays disabled until the page reloads.
+import { describe, it, expect, beforeEach } from 'vitest'
+import { pinCustody } from '#/core'
 
-const enter = vi.fn()
-const enterWithPin = vi.fn()
-const initSession = vi.fn()
+import { enterByPin } from '../lib/enter'
+import { session } from '../model/private'
+import { isCalculationInProgress } from '../lib/busy'
 
-vi.mock('../model/private', () => ({
-  session: {
-    enter: (...a: unknown[]) => enter(...a),
-    enterWithPin: (...a: unknown[]) => enterWithPin(...a),
-    subscribe: () => () => undefined,
-    isOnlinePinSet: () => false,
-    isOfflinePinSet: () => false,
-    vault: () => ({
-      write: () => Promise.resolve(),
-      clear: () => Promise.resolve(),
-    }),
-  },
-  initSession: (...a: unknown[]) => initSession(...a),
-}))
+Object.defineProperty(global, 'crypto', { value: webcrypto })
 
-const { isCalculationInProgress } = await import('../model/public')
-const { enterByPassword, enterByPin } = await import('../lib/enter')
+// The flag discipline itself lives in busy.spec (runBlocking owns it). What
+// is pinned here is what a PIN attempt MEANS: the custody's reason must
+// survive to the login form verbatim — a network outage is not a wrong PIN.
+// No mocks: the real session, the real custody, the real storage.
 
-const kit = { id: 'ABCD', services: null }
+const originBuffer = () => crypto.getRandomValues(new Uint8Array(256)).buffer
 
-describe('session entry flag discipline', () => {
+describe('PIN entry', () => {
   beforeEach(() => {
-    enter.mockReset()
-    enterWithPin.mockReset()
-    isCalculationInProgress.value = false
+    localStorage.clear()
   })
 
-  it('releases the flag after a failed password attempt', async () => {
-    enter.mockRejectedValue(new Error('bad password'))
-
-    await expect(enterByPassword('wrong')).rejects.toThrow()
+  it('says no PIN is set when nothing is held', async () => {
+    await expect(enterByPin('12345678')).rejects.toThrow(
+      'No PIN is set on this device',
+    )
 
     expect(isCalculationInProgress.value).toBe(false)
+    expect(session.isActive()).toBe(false)
   })
 
-  it('releases the flag after a successful password attempt', async () => {
-    enter.mockResolvedValue(kit)
+  it('says the PIN is wrong when the stored custody refuses it', async () => {
+    await pinCustody.store('offline', '12345678', originBuffer())
 
-    await enterByPassword('right')
+    await expect(enterByPin('87654321')).rejects.toThrow('Wrong PIN')
 
-    expect(initSession).toHaveBeenCalledWith('ABCD', null)
     expect(isCalculationInProgress.value).toBe(false)
+    expect(session.isActive()).toBe(false)
   })
 
-  it('releases the flag after a failed PIN attempt', async () => {
-    enterWithPin.mockRejectedValue(new PinReleaseError('wrongPin'))
+  it('signs in with the stored PIN and the flag is released', async () => {
+    await pinCustody.store('offline', '12345678', originBuffer())
 
-    await expect(enterByPin('00000000')).rejects.toThrow('Wrong PIN')
+    await enterByPin('12345678')
 
+    expect(session.isActive()).toBe(true)
     expect(isCalculationInProgress.value).toBe(false)
-  })
 
-  it('says what actually failed instead of blaming the PIN', async () => {
-    // A network outage is not a wrong PIN; the reason survives to the form.
-    enterWithPin.mockRejectedValue(new PinReleaseError('network'))
-
-    await expect(enterByPin('00000000')).rejects.toThrow('Network error')
-
-    expect(isCalculationInProgress.value).toBe(false)
-  })
-
-  it('rethrows what it cannot explain', async () => {
-    enterWithPin.mockRejectedValue(new Error('bad pin'))
-
-    await expect(enterByPin('00000000')).rejects.toThrow('bad pin')
-
-    expect(isCalculationInProgress.value).toBe(false)
+    session.exit()
   })
 })

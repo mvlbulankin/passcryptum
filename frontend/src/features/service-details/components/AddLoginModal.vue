@@ -4,7 +4,11 @@ import { AddCircleOutline, PersonAddOutline } from '@vicons/ionicons5'
 import { NIcon, NModal, NSpace, NInput, useLoadingBar } from 'naive-ui'
 
 import { FormSubmit } from '@/shared'
-import { addServiceAndLogin, isCalculationInProgress } from '@/entities/session'
+import {
+  addServiceAndLogin,
+  isCalculationInProgress,
+  runBlocking,
+} from '@/entities/session'
 import { service, showAddLoginModal } from '../model'
 
 const loginName = ref('')
@@ -19,18 +23,16 @@ const clearForm = () => {
 }
 
 const onSubmit = () => {
-  loadingBar.start()
-
-  addServiceAndLogin(service.name, loginName.value).then(() => {
-    loadingBar.finish()
-
-    showAddLoginModal.value = false
-    isCalculationInProgress.value = false
-  })
+  const login = loginName.value
 
   clearForm()
 
-  isCalculationInProgress.value = true
+  void runBlocking(
+    () => addServiceAndLogin(service.name, login),
+    loadingBar,
+  ).then(() => {
+    showAddLoginModal.value = false
+  })
 }
 </script>
 

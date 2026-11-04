@@ -2,16 +2,22 @@
 import { NButton, useLoadingBar } from 'naive-ui'
 import { DownloadOutline } from '@vicons/ionicons5'
 
-import { session, sessionId, areServicesEmpty } from '@/entities/session'
+import {
+  session,
+  sessionId,
+  areServicesEmpty,
+  runBlocking,
+} from '@/entities/session'
 
 const loadingBar = useLoadingBar()
 const linkElement = document.createElement('a')
 const BINARY_MIME_TYPE = 'application/octet-stream'
 
 const onClick = async () => {
-  loadingBar.start()
-
-  const buffer = await session.vault().exportBytes()
+  const buffer = await runBlocking(
+    () => session.vault().exportBytes(),
+    loadingBar,
+  )
 
   if (!buffer) {
     throw new Error('There is nothing to download')
@@ -25,7 +31,6 @@ const onClick = async () => {
   linkElement.download = `${sessionId.value}.dat`
 
   linkElement.click()
-  loadingBar.finish()
 }
 </script>
 

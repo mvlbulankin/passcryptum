@@ -1,14 +1,12 @@
 import { PinReleaseError, type CustodyReason } from '#/core'
 
-import { session, initSession } from '../model/private'
-import { isCalculationInProgress } from '../model/public'
+import { session, setServices } from '../model/private'
 
-// The flag gates the login form (disabled input + button). It must be
-// released on EVERY exit path — a failed attempt that leaves it set locks
-// the user out of the form until a page reload.
+// What a login attempt MEANS. Holding the busy flag and driving the loading
+// bar is runBlocking's job; the page wraps the attempt in it.
 
 /** The custody's closed vocabulary, mapped to what the login form can say. */
-const pinReleaseMessage = (reason: CustodyReason): string => {
+export const pinReleaseMessage = (reason: CustodyReason): string => {
   switch (reason) {
     case 'wrongPin':
       return 'Wrong PIN'
@@ -22,31 +20,21 @@ const pinReleaseMessage = (reason: CustodyReason): string => {
 }
 
 export const enterByPassword = async (password: string) => {
-  isCalculationInProgress.value = true
+  const kit = await session.enter(password)
 
-  try {
-    const kit = await session.enter(password)
-
-    initSession(kit.id, kit.services)
-  } finally {
-    isCalculationInProgress.value = false
-  }
+  setServices(kit.services)
 }
 
 export const enterByPin = async (pin: string) => {
-  isCalculationInProgress.value = true
-
   try {
     const kit = await session.enterWithPin(pin)
 
-    initSession(kit.id, kit.services)
+    setServices(kit.services)
   } catch (e) {
     if (e instanceof PinReleaseError) {
       throw new Error(pinReleaseMessage(e.reason))
     }
 
     throw e
-  } finally {
-    isCalculationInProgress.value = false
   }
 }

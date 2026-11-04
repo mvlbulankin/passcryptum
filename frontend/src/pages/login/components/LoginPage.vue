@@ -19,6 +19,7 @@ import {
   enterByPin,
   enterByPassword,
   isCalculationInProgress,
+  runBlocking,
   session,
 } from '@/entities/session'
 import { isOnlineMode, useChangeOnlineMode } from '@/features/online-mode'
@@ -45,31 +46,24 @@ const { toggleOnlineMode } = useChangeOnlineMode()
 const { downloadServices } = useDownloadServices()
 
 const onEnterPin = async (pin: string) => {
-  loadingBar.start()
-
   try {
-    await enterByPin(pin)
-    loadingBar.finish()
+    await runBlocking(() => enterByPin(pin), loadingBar)
   } catch (e) {
-    void e
-    loadingBar.error()
-    message.error('Wrong PIN')
+    // The attempt's message already says what failed (wrong PIN, no stored
+    // PIN, network): do not overwrite it with a blanket guess.
+    message.error(e instanceof Error ? e.message : 'Sign in failed')
   }
 }
 
 const onEnterPassword = async (password: string) => {
-  loadingBar.start()
-
   try {
-    await enterByPassword(password)
-    loadingBar.finish()
+    await runBlocking(() => enterByPassword(password), loadingBar)
 
     if (!session.hasVisited()) {
       promptOnlineMode()
     }
   } catch (e) {
     void e
-    loadingBar.error()
     message.error('Wrong password')
   }
 }

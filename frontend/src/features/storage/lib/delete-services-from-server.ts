@@ -1,7 +1,7 @@
 import { useDialog, useMessage, useLoadingBar } from 'naive-ui'
 import { wire, isForbidden } from '#/core'
 
-import { session } from '@/entities/session'
+import { runBlocking, session } from '@/entities/session'
 import { showStorageDrawer } from '@/features/storage/model'
 
 import { showPublicKeyError } from './public-key-error'
@@ -12,11 +12,11 @@ export const useDeleteServices = () => {
   const loadingBar = useLoadingBar()
 
   const deleteServices = async () => {
-    loadingBar.start()
-
     try {
-      const keyPairSeed = session.keyPairSeed()
-      const result = await wire.clearServices(keyPairSeed)
+      const result = await runBlocking(
+        () => wire.clearServices(session.keyPairSeed()),
+        loadingBar,
+      )
 
       if (result === 'cleared') {
         message.success('All of your services have been deleted from server')
@@ -32,7 +32,6 @@ export const useDeleteServices = () => {
         console.error('An unknown error occurred:', e)
       }
     } finally {
-      loadingBar.finish()
       showStorageDrawer.value = false
     }
   }

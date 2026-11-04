@@ -8,6 +8,7 @@ import {
   session,
   importServices,
   isCalculationInProgress,
+  runBlocking,
 } from '@/entities/session'
 import { FormSubmit } from '@/shared'
 
@@ -19,14 +20,13 @@ const onSubmit = async () => {
   const text = servicesString.value
 
   servicesString.value = ''
-  isCalculationInProgress.value = true
-  loadingBar.start()
 
   // The vault accepts both pasted plaintext (a JSON export) and an
   // encrypted blob — one entry point, no format guessing in the caller.
-  const config = await session.vault().importText(text)
-
-  isCalculationInProgress.value = false
+  const config = await runBlocking(
+    () => session.vault().importText(text),
+    loadingBar,
+  )
 
   if (!config || checkForEmptiness(config)) {
     loadingBar.error()
@@ -36,7 +36,6 @@ const onSubmit = async () => {
   }
 
   await importServices(config)
-  loadingBar.finish()
   message.success('Services have been imported')
 }
 </script>

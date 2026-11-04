@@ -6,6 +6,7 @@ import {
   isOnlinePinSet,
   isOfflinePinSet,
   isCalculationInProgress,
+  runBlocking,
 } from '@/entities/session'
 import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
 
@@ -25,27 +26,23 @@ export const useDeleteOnlinePin = () => {
         positiveText: 'Yes, delete online PIN',
         negativeText: 'Cancel',
         async onPositiveClick() {
-          loadingBar.start()
-
           try {
-            const revoked = await pinCustody.revoke('online')
+            const revoked = await runBlocking(
+              () => pinCustody.revoke('online'),
+              loadingBar,
+            )
 
             if (revoked.ok) {
               message.info('Your online PIN has been deleted')
-            } else if (
-              revoked.reason === 'unknownCredential' ||
-              revoked.reason === 'unknownProfile'
-            ) {
-              // The credential (or the profile) is gone server-side; the
-              // device's record cannot be used to revoke what is not there.
+            } else if (revoked.reason === 'unknownCredential') {
+              // The credential is gone server-side; the device's record
+              // cannot revoke what is not there.
               showPublicKeyError(dialog)
             } else {
               message.error('Failed to delete the online PIN')
             }
-          } finally {
-            // The custody notified its subscribers: PIN availability
-            // re-derives without a manual touch.
-            loadingBar.finish()
+          } catch {
+            message.error('Failed to delete the online PIN')
           }
         },
       })
@@ -69,11 +66,9 @@ export const useDeleteOfflinePin = () => {
         positiveText: 'Yes, delete offline PIN',
         negativeText: 'Cancel',
         onPositiveClick() {
-          loadingBar.start()
+          void runBlocking(() => pinCustody.revoke('offline'), loadingBar)
 
-          pinCustody.revoke('offline')
           message.info('Your offline PIN has been deleted')
-          requestAnimationFrame(() => loadingBar.finish())
         },
       })
     },

@@ -14,7 +14,7 @@ import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
 
 import { FormSubmit } from '@/shared'
 import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
-import { isCalculationInProgress } from '@/entities/session'
+import { isCalculationInProgress, runBlocking } from '@/entities/session'
 import { session, setPinKind } from '../model'
 
 const pin = ref('')
@@ -51,21 +51,6 @@ const clearForm = () => {
   pin.value = ''
 }
 
-const stop = (failed: boolean) => {
-  if (failed) {
-    loadingBar.error()
-  } else {
-    loadingBar.finish()
-  }
-
-  isCalculationInProgress.value = false
-}
-
-const fail = () => {
-  message.error(`Failed to set ${isOnline.value ? 'online' : 'offline'} PIN`)
-  stop(true)
-}
-
 const onSubmit = () => {
   if (pin.value.length < MIN_PIN_LENGTH || kind.value === null) {
     message.error(`PIN must be at least ${MIN_PIN_LENGTH} characters`)
@@ -73,27 +58,33 @@ const onSubmit = () => {
     return
   }
 
-  loadingBar.start()
-  isCalculationInProgress.value = true
+  const target = kind.value
+  const { value } = pin
 
-  pinCustody
-    .store(kind.value, pin.value, session.originBuffer())
+  void runBlocking(
+    () => pinCustody.store(target, value, session.originBuffer()),
+    loadingBar,
+  )
     .then(result => {
       if (result.ok) {
         message.success(successText.value)
-        stop(false)
         setPinKind.value = null
         clearForm()
       } else if (result.reason === 'unknownProfile') {
         // Only the online hand-over can be refused this way, and only it
         // explains the refusal with the public-key dialog.
-        stop(false)
         showPublicKeyError(dialog)
       } else {
-        fail()
+        message.error(
+          `Failed to set ${isOnline.value ? 'online' : 'offline'} PIN`,
+        )
       }
     })
-    .catch(fail)
+    .catch(() => {
+      message.error(
+        `Failed to set ${isOnline.value ? 'online' : 'offline'} PIN`,
+      )
+    })
 }
 </script>
 

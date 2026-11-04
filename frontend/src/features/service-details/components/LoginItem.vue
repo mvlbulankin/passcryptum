@@ -10,7 +10,7 @@ import { ref, onMounted } from 'vue'
 import { LoginData } from '#/services'
 
 import { createElementRef } from '@/shared'
-import { rmLogin, setVersionOfLogin } from '@/entities/session'
+import { rmLogin, runBlocking, setVersionOfLogin } from '@/entities/session'
 import { service } from '../model'
 
 const dialog = useDialog()
@@ -35,10 +35,10 @@ const onDeleteClick = () => {
     positiveText: 'Delete',
     negativeText: 'Cancel',
     onPositiveClick() {
-      loadingBar.start()
-
-      rmLogin(service.name, props.login.name).then(() => {
-        loadingBar.finish()
+      void runBlocking(
+        () => rmLogin(service.name, props.login.name),
+        loadingBar,
+      ).then(() => {
         message.info(`The login '${props.login.name}' has been deleted`)
       })
     },

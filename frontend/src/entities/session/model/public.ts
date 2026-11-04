@@ -14,7 +14,10 @@ import { pinCustody } from '#/core'
 
 import { privateServices, privateSessionId, session } from './private'
 
-export const isCalculationInProgress = ref(false)
+// The busy owner: the flag is written by runBlocking alone.
+export { isCalculationInProgress, runBlocking } from '../lib/busy'
+
+export type { Bar } from '../lib/busy'
 
 // PIN availability is derived from the custody's storage — never a stale
 // copy. The refs exist only to re-evaluate on changes: the session fires on

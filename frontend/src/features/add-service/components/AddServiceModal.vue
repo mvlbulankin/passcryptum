@@ -8,7 +8,11 @@ import {
 import { NIcon, NModal, NSpace, NInput, useLoadingBar } from 'naive-ui'
 
 import { FormSubmit } from '@/shared'
-import { addServiceAndLogin, isCalculationInProgress } from '@/entities/session'
+import {
+  addServiceAndLogin,
+  isCalculationInProgress,
+  runBlocking,
+} from '@/entities/session'
 import { showAddServiceModal } from '../model'
 
 const serviceName = ref('')
@@ -21,18 +25,16 @@ const clearForm = () => {
 }
 
 const onSubmit = () => {
-  loadingBar.start()
-
-  addServiceAndLogin(serviceName.value, loginName.value).then(() => {
-    loadingBar.finish()
-
-    showAddServiceModal.value = false
-    isCalculationInProgress.value = false
-  })
+  const name = serviceName.value
+  const login = loginName.value
 
   clearForm()
 
-  isCalculationInProgress.value = true
+  void runBlocking(() => addServiceAndLogin(name, login), loadingBar).then(
+    () => {
+      showAddServiceModal.value = false
+    },
+  )
 }
 </script>
 

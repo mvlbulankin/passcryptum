@@ -2,7 +2,11 @@
 import { Close } from '@vicons/ionicons5'
 import { NButton, useDialog, useMessage, useLoadingBar } from 'naive-ui'
 
-import { clearServices, areServicesEmpty } from '@/entities/session'
+import {
+  clearServices,
+  areServicesEmpty,
+  runBlocking,
+} from '@/entities/session'
 import { showStorageDrawer } from '../model'
 
 const dialog = useDialog()
@@ -16,10 +20,9 @@ const onClick = () => {
     positiveText: 'Delete',
     negativeText: 'Cancel',
     onPositiveClick() {
-      clearServices()
-      loadingBar.start()
+      void runBlocking(() => clearServices(), loadingBar)
+
       message.info('All of your services have been deleted')
-      requestAnimationFrame(() => loadingBar.finish())
 
       showStorageDrawer.value = false
     },

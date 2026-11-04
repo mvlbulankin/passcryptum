@@ -3,7 +3,7 @@ import { DocumentOutline } from '@vicons/ionicons5'
 import { NH4, NButton, useMessage, useLoadingBar } from 'naive-ui'
 import { checkForEmptiness } from '#/services'
 
-import { session, importServices } from '@/entities/session'
+import { session, importServices, runBlocking } from '@/entities/session'
 
 const message = useMessage()
 const loadingBar = useLoadingBar()
@@ -24,9 +24,10 @@ element.addEventListener('change', async () => {
     return
   }
 
-  loadingBar.start()
-
-  const config = await session.vault().importBytes(await file.arrayBuffer())
+  const config = await runBlocking(
+    async () => session.vault().importBytes(await file.arrayBuffer()),
+    loadingBar,
+  )
 
   if (!config || checkForEmptiness(config)) {
     loadingBar.error()
@@ -38,7 +39,6 @@ element.addEventListener('change', async () => {
   // importServices persists through the vault; writing again here would
   // store an unmerged copy over the merged one.
   await importServices(config)
-  loadingBar.finish()
   message.success('Services have been imported')
 })
 
