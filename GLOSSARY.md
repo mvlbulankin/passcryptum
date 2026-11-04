@@ -11,6 +11,15 @@ device; never sent to the server. IVs are not taken from the buffer — each
 record gets a fresh random IV; legacy blobs with a static IV are still
 readable.
 
+## PIN Custody
+
+The device's arrangement for holding the Origin Buffer under a PIN, so the
+user can return without the master password. Two independent kinds: online
+custody stores it as a Credential on the server (the device keeps the public
+key and the Protector); offline custody keeps an encrypted blob on the
+device. Either can be set or revoked independently, and revoking custody
+never touches the Origin Buffer itself.
+
 ## Profile
 
 The server-side entity identified by an Ed25519 public key (`public_key`).
