@@ -46,6 +46,31 @@ describe('runBlocking', () => {
     expect(bar.calls).toEqual(['start', 'finish'])
   })
 
+  it('reports a failure from any overlapping operation', async () => {
+    // A failed inner action must not be glossed over as a success by the
+    // outer one that happens to finish last.
+    const bar = recordingBar()
+
+    let releaseOuter = () => undefined as void
+
+    const outer = runBlocking(
+      () =>
+        new Promise<void>(resolve => {
+          releaseOuter = resolve
+        }),
+      bar,
+    )
+
+    await expect(
+      runBlocking(() => Promise.reject(new Error('x')), bar),
+    ).rejects.toThrow('x')
+
+    releaseOuter()
+    await outer
+
+    expect(bar.calls).toEqual(['start', 'error'])
+  })
+
   it('holds the flag while the action runs', async () => {
     expect(isCalculationInProgress.value).toBe(false)
 

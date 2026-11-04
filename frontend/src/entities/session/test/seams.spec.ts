@@ -28,6 +28,7 @@ const read = (file: string) => readFileSync(file, 'utf-8')
 /** Any import from `dir/...` that is not exactly `dir`. */
 const deepImports = (source: string, dir: string): string[] => {
   const escaped = dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
   const pattern = new RegExp(
     `from\\s+['"]${escaped}/(?!index['"])([^'"]+)['"]`,
     'g',

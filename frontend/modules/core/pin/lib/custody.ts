@@ -11,8 +11,9 @@ import {
   parseOriginBuffer,
   pbkdf2,
   uint8ArrayToBase64,
+  fromWireFailure,
 } from '../../shared'
-import { WireError, wire as defaultWire } from '../../wire'
+import { wire as defaultWire } from '../../wire'
 import type { WireClient } from '../../wire'
 import {
   LS_KEY_MODE,
@@ -126,22 +127,14 @@ const fail = (reason: CustodyReason): { ok: false; reason: CustodyReason } => ({
 
 /** A wire failure becomes a custody outcome; forbidden means one thing per
  * operation, so the caller says what. */
-const wireFailure = (
-  e: unknown,
-  forbidden: CustodyReason,
-): { ok: false; reason: CustodyReason } => {
-  if (e instanceof WireError) {
-    if (e.kind === 'forbidden') {
-      return fail(forbidden)
-    }
-
-    if (e.kind === 'network') {
-      return fail('network')
-    }
-  }
-
-  return fail('unexpected')
-}
+const wireFailure = (e: unknown, forbidden: CustodyReason) =>
+  fail(
+    fromWireFailure(e, {
+      forbidden,
+      network: 'network',
+      unexpected: 'unexpected',
+    }),
+  )
 
 export const createPinCustody = (
   deps: { storage?: CustodyStorage; wire?: WireClient } = {},
@@ -157,8 +150,9 @@ export const createPinCustody = (
   /**
    * A custody's salt. Each custody owns one: the offline blob and the online
    * Credential are sealed independently, so setting, re-setting or revoking
-   * one can never invalidate the other. A device with no salt stored has
-   * none (the PIN alone keys the blob) — see storeOffline.
+   * one can never invalidate the other. Both hand-overs generate a salt when
+   * the device has none, so a stored blob without one predates the split
+   * (ADR-0008) and no longer exists in the fleet.
    */
   const saltOf = (kind: CustodyKind) =>
     storage.getItem(
@@ -198,9 +192,9 @@ export const createPinCustody = (
     buffer: ArrayBuffer,
   ): Promise<StoreOutcome> => {
     // The online custody's own salt, distinct from the offline one so the
-    // two cannot invalidate each other. A fresh one per hand-over, persisted
-    // only on success: a failed hand-over must not re-salt the key an
-    // existing custody depends on.
+    // two cannot invalidate each other. Reused when the device already has
+    // one, and persisted only on success: a failed hand-over must not
+    // re-salt the key an existing custody depends on.
     const salt = saltOf('online') || generateRandomString()
 
     try {
@@ -275,19 +269,9 @@ export const createPinCustody = (
 
       return { ok: true, buffer }
     } catch (e) {
-      if (e instanceof WireError) {
-        // The server answers a bare 403 to a wrong PIN, a stale device
-        // record and a lockout alike: indistinguishable, so one answer.
-        if (e.kind === 'forbidden') {
-          return fail('wrongPin')
-        }
-
-        if (e.kind === 'network') {
-          return fail('network')
-        }
-      }
-
-      return fail('unexpected')
+      // The server answers a bare 403 to a wrong PIN, a stale device record
+      // and a lockout alike: indistinguishable, so one answer.
+      return wireFailure(e, 'wrongPin')
     }
   }
 

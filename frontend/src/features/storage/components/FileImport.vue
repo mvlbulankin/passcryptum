@@ -30,7 +30,8 @@ element.addEventListener('change', async () => {
   )
 
   if (!config || checkForEmptiness(config)) {
-    loadingBar.error()
+    // The bar belongs to runBlocking: reporting a second time here would
+    // finish it (success) and then paint it as an error.
     message.error('An error occurred while importing')
 
     return

@@ -1,7 +1,6 @@
 import type { ServicesConfig } from '../../../services'
 
 import type { Vault } from '../../vault'
-import type { WireClient } from '../../wire'
 
 /**
  * What pushing or pulling the Vault needs from the device: the keys the
@@ -29,16 +28,13 @@ export type PushOutcome =
 export type PullOutcome =
   | {
       ok: true
-      result: 'pulled' | 'nothingOnServer' | 'corrupt' | 'emptyAfterMerge'
+      result: 'pulled' | 'nothingOnServer' | 'corrupt'
     }
   | { ok: false; reason: SyncReason }
 
 export type ClearOutcome =
   | { ok: true; result: 'cleared' | 'alreadyEmpty' }
   | { ok: false; reason: SyncReason }
-
-/** The wire's own vocabulary for DELETE: what the module reports. */
-export type WireClearResult = 'cleared' | 'already-empty'
 
 /**
  * Synchronising the Vault between devices (the reason 3.0 exists). The
@@ -51,5 +47,3 @@ export type VaultSync = {
   pull(device: VaultSyncDevice): Promise<PullOutcome>
   clear(device: VaultSyncDevice): Promise<ClearOutcome>
 }
-
-export type SyncWire = WireClient

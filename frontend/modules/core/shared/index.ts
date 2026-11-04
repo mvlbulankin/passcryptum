@@ -30,3 +30,5 @@ export { formatPassword } from './lib/format-password'
 export { generateRandomString } from './lib/generate-random-string'
 
 export { parseOriginBuffer } from './lib/origin-buffer'
+
+export { fromWireFailure } from './lib/wire-failure'

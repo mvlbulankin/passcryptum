@@ -71,6 +71,7 @@ Vault.read(): Promise<ServicesConfig | null>
 Vault.write(services): Promise<void>
 Vault.clear(): Promise<void>
 Vault.exportBytes(): Promise<Uint8Array | null>
+Vault.exportText(): Promise<string | null>   // the stored representation, pairs importText
 Vault.importBytes(bytes): Promise<ServicesConfig | null>
 Vault.importText(text): Promise<ServicesConfig | null>
 ```
@@ -88,8 +89,9 @@ wire.getEntropy(...) / createCredential(...) / deleteCredential(...)
 
 Each function is one Wire Protocol endpoint; framing, signing, nonce and
 version headers are internal — an endpoint table drives one request builder.
-Failures are `WireError` with a `kind`;
-`isForbidden(e)` answers the one case the UI treats specially.
+Failures are `WireError` with a `kind`. Callers map the kind onto their own
+closed vocabulary (`fromWireFailure`), because what a 403 means depends on
+the operation.
 
 ## Synchronising the Vault
 
@@ -102,9 +104,8 @@ vaultSync.push(device) / pull(device) / clear(device)
 wrapped in the session's secretbox keys) and the merge policy — pulling
 merges with what the device holds instead of overwriting it — are the
 module's business. Outcomes are a closed vocabulary
-(`pushed`/`nothingToPush`, `pulled`/`nothingOnServer`/`corrupt`/
-`emptyAfterMerge`, `cleared`/`alreadyEmpty`, plus `unknownProfile`,
-`network`, `unexpected`).
+(`pushed`/`nothingToPush`, `pulled`/`nothingOnServer`/`corrupt`,
+`cleared`/`alreadyEmpty`, plus `unknownProfile`, `network`, `unexpected`).
 
 ## Subscribing to state
 

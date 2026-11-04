@@ -16,11 +16,13 @@ import { WireError } from './wire-error'
 // The Wire Protocol client's implementation.
 //
 // An endpoint is a row of data: method, URL, which factors the request
-// carries, which way it is signed, and what a successful status means. One
-// builder turns a row into a request. Before this, each of the six
-// endpoints was a closure that rebuilt the same version headers, base64
-// block and status ladder by hand — so every protocol tweak (the version
-// header, the nonce) had to be applied in several places in one file.
+// carries, and which way it is signed. One builder turns a row into a
+// request; each call site then reads the statuses the contract defines for
+// that endpoint (200/204/403 mean different things per endpoint, so that
+// mapping stays with the caller). Before this, each of the six endpoints was
+// a closure that rebuilt the same version headers, base64 block and status
+// ladder by hand — so every protocol tweak (the version header, the nonce)
+// had to be applied in several places in one file.
 //
 // Nothing here changes the bytes: framing, signing and the status
 // vocabulary are the same ones ADR-0003 pins and wire.spec.ts checks.
@@ -124,18 +126,35 @@ const baseHeaders = (): Record<string, string> => ({
   'Content-Type': 'application/json',
 })
 
+type Factor = 'hashedPin' | 'protector'
+
+/** Header name and the caller's material for each factor, in one place. */
+const FACTORS: Record<
+  Factor,
+  { header: string; value: (params: Params) => Uint8Array | undefined }
+> = {
+  hashedPin: {
+    header: 'Hashed-Pin',
+    value: params => params.hashedPin,
+  },
+  protector: {
+    header: 'Protector',
+    value: params => params.protector,
+  },
+}
+
 const factorHeaders = (recipe: Recipe, params: Params) => {
   const headers: Record<string, string> = {}
 
   for (const factor of recipe.factors ?? []) {
-    const value = factor === 'hashedPin' ? params.hashedPin : params.protector
+    const { header, value } = FACTORS[factor as Factor]
+    const material = value(params)
 
-    if (!value) {
+    if (!material) {
       throw new Error(`wire: ${factor} is required by this endpoint`)
     }
 
-    headers[factor === 'hashedPin' ? 'Hashed-Pin' : 'Protector'] =
-      uint8ArrayToBase64(value)
+    headers[header] = uint8ArrayToBase64(material)
   }
 
   return headers

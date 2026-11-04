@@ -32,13 +32,19 @@ pinCustody.subscribe(() => {
   sessionRevision.value += 1
 })
 
-export const isOnlinePinSet = computed(
-  () => sessionRevision.value >= 0 && pinCustody.isSet('online'),
-)
+// Re-computed on any session or custody change: pinCustody.isSet reads
+// storage, so the revision is tracked explicitly rather than inferred.
+export const isOnlinePinSet = computed(() => {
+  void sessionRevision.value
 
-export const isOfflinePinSet = computed(
-  () => sessionRevision.value >= 0 && pinCustody.isSet('offline'),
-)
+  return pinCustody.isSet('online')
+})
+
+export const isOfflinePinSet = computed(() => {
+  void sessionRevision.value
+
+  return pinCustody.isSet('offline')
+})
 
 export const sessionId = computed(() => privateSessionId.value)
 

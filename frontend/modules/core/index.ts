@@ -18,7 +18,7 @@ export type { Session, SessionDeps, SessionMode, StarterKit } from './session'
 // business (the copy forms speak about it).
 export type { Vault } from './vault'
 
-export { wire, WireError, isForbidden } from './wire'
+export { wire } from './wire'
 
 export type { WireErrorKind } from './wire'
 
@@ -37,29 +37,10 @@ export {
   uint8ArrayToBase64,
 } from './shared'
 
-export { pinCustody, createPinCustody } from './pin'
+export { pinCustody } from './pin'
 
-export type {
-  PinCustody,
-  CustodyKind,
-  CustodyMode,
-  CustodyReason,
-  StoreOutcome,
-  ReleaseOutcome,
-  RevokeOutcome,
-} from './pin'
+export type { CustodyKind, CustodyMode, CustodyReason } from './pin'
 
-// The Origin Buffer layout is shared by the session and the custody; it
-// lives with the crypto primitives, not in either consumer.
-export { parseOriginBuffer } from './shared'
+export { vaultSync } from './sync'
 
-export { vaultSync, createVaultSync } from './sync'
-
-export type {
-  VaultSync,
-  VaultSyncDevice,
-  SyncReason,
-  PushOutcome,
-  PullOutcome,
-  ClearOutcome,
-} from './sync'
+export type { SyncReason, PushOutcome, PullOutcome, ClearOutcome } from './sync'

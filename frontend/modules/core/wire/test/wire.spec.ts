@@ -323,6 +323,7 @@ describe('endpoint recipes', () => {
   const client = createWireClient(
     fakeTransport(() => ({ status: 200, body: '"AAAA"' })),
   )
+
   const protector = new Uint8Array(32).fill(1)
   const hashedPin = new Uint8Array(32).fill(2)
   const payload = new Uint8Array(4).fill(3)
@@ -381,6 +382,7 @@ describe('endpoint recipes', () => {
       () => client.clearServices(seed),
       () => client.createCredential(seed, hashedPin, payload),
     ]
+
     const unsigned: Array<() => Promise<unknown>> = [
       () => client.getEntropy(publicKey, hashedPin, protector),
       () => client.deleteCredential(publicKey, protector),

@@ -11,6 +11,11 @@ import { computed, readonly, ref } from 'vue'
 
 const inFlight = ref(0)
 
+// Whether ANY operation in the current overlap failed. Per-call state would
+// let a failed inner action be reported as a success by the outermost one
+// (the outer call decides what the bar shows when the count reaches zero).
+let failedAnywhere = false
+
 /** True while any blocking operation is in flight. Never write to it. */
 export const isCalculationInProgress = readonly(
   computed(() => inFlight.value > 0),
@@ -42,22 +47,21 @@ export const runBlocking = async <T>(
   inFlight.value += 1
 
   if (inFlight.value === 1) {
+    failedAnywhere = false
     bar?.start()
   }
-
-  let failed = false
 
   try {
     return await action()
   } catch (e) {
-    failed = true
+    failedAnywhere = true
 
     throw e
   } finally {
     inFlight.value -= 1
 
     if (inFlight.value === 0) {
-      if (failed) {
+      if (failedAnywhere) {
         bar?.error()
       } else {
         bar?.finish()

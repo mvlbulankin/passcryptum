@@ -1,7 +1,7 @@
 import { checkForEmptiness, mergeConfigurations } from '../../../services'
 
-import { decryptData, encryptData } from '../../shared'
-import { WireError, wire as defaultWire } from '../../wire'
+import { decryptData, encryptData, fromWireFailure } from '../../shared'
+import { wire as defaultWire } from '../../wire'
 import type { WireClient } from '../../wire'
 import type {
   ClearOutcome,
@@ -19,19 +19,14 @@ const fail = (reason: SyncReason) => ({ ok: false as const, reason })
  * signature-authenticated, so a 403 always means the same thing: the
  * Profile is not onboarded.
  */
-const wireFailure = (e: unknown) => {
-  if (e instanceof WireError) {
-    if (e.kind === 'forbidden') {
-      return fail('unknownProfile')
-    }
-
-    if (e.kind === 'network') {
-      return fail('network')
-    }
-  }
-
-  return fail('unexpected')
-}
+const wireFailure = (e: unknown) =>
+  fail(
+    fromWireFailure(e, {
+      forbidden: 'unknownProfile',
+      network: 'network',
+      unexpected: 'unexpected',
+    }),
+  )
 
 export const createVaultSync = (
   deps: { wire?: WireClient } = {},
@@ -85,11 +80,9 @@ export const createVaultSync = (
       }
 
       // Merge policy: pulling never clobbers what this device already has.
+      // `pulled` is non-empty here, so the merge is too — there is no empty
+      // outcome to report.
       const merged = mergeConfigurations(await current(device), pulled)
-
-      if (checkForEmptiness(merged)) {
-        return { ok: true, result: 'emptyAfterMerge' }
-      }
 
       await device.apply(merged)
 

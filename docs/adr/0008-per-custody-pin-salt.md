@@ -65,8 +65,10 @@ buffer") is now true for both custodities, so the empty-salt caveat is gone.
 
 `e2e/pin.spec.ts` drives the two sequences that used to break — online PIN
 then offline PIN, and revoke-online then offline sign-in — through the real
-UI, and the first of them goes red if the salts are shared again (verified
-by reintroducing the shared salt).
+UI. The first of them goes red if the salts are shared again; verified by
+replacing `saltOf`'s per-kind key selection with the shared key and running
+the spec: the sign-in times out waiting for the work area (the vault never
+opens), 1 failed / 2 passed. The sabotage was reverted immediately.
 
 `isSet('online')` includes the online salt in its record again: every write
 now creates it, so its absence means an incomplete pairing.
