@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { uint8ArrayToBase64 } from '#/core'
 
-import { session } from '@/entities/session/model/private'
 import { CopyButton } from '@/shared'
-import { isCalculationInProgress } from '@/entities/session'
+import { isCalculationInProgress, session } from '@/entities/session'
 
 const getPublicKey = () => uint8ArrayToBase64(session.publicKey())
 </script>
