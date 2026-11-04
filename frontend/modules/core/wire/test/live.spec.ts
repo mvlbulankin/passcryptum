@@ -6,7 +6,7 @@ import { createWireClient } from '../index'
 // Cross-language integration: the REAL frontend wire client against a REAL
 // backend. The contract suite proves the backend against a Go client; this
 // proves the same protocol from the TypeScript side (framing, signing, the
-// v2 Hashed-Pin KDF, base64 headers) — the seam neither suite covers alone.
+// client-side Hashed-Pin KDF, base64 headers) — the seam neither suite covers alone.
 //
 // Opt-in: set PC_BASE_URL (and PC_PRIVATE_SEED, PC_PUBLIC_KEY of an onboarded
 // profile) to run. Skipped otherwise, like the Go contract suite.
@@ -44,7 +44,7 @@ const transport =
     body?: string
     headers: Record<string, string>
   }) => {
-    // Same layout the app produces, signed the v2 way, sent with fetch.
+    // Same layout the app produces, signed per the protocol, sent with fetch.
     void method
 
     const target = url.replace(/^https?:\/\/[^/]+/, base as string)
@@ -113,7 +113,7 @@ describe.skipIf(!base || !seedB64 || !pubB64)(
     )
 
     itLive(
-      'issues and reads back a credential through the v2 Hashed-Pin KDF',
+      'issues and reads back a credential through the client-side Hashed-Pin KDF',
       async () => {
         const { seed, publicKey } = keypair()
         const wire = createWireClient(req => transport(req.method)(req))
@@ -169,7 +169,7 @@ describe.skipIf(!base || !seedB64 || !pubB64)(
     )
 
     itLive(
-      'rejects a captured GET signature replayed as DELETE (v2 method binding)',
+      'rejects a captured GET signature replayed as DELETE (method binding)',
       async () => {
         const { secretKey, publicKey } = keypair()
         // Craft the two requests by hand: sign "GET", send as DELETE.

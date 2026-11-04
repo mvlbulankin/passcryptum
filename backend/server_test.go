@@ -32,11 +32,12 @@ var (
 )
 
 type fixture struct {
-	t   *testing.T
-	st  *store.Store
-	g   *guard.Guard
-	srv *server
-	now time.Time
+	t    *testing.T
+	st   *store.Store
+	g    *guard.Guard
+	srv  *server
+	now  time.Time
+	nseq int
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -73,26 +74,49 @@ func (f *fixture) onboard(pub string) {
 	}
 }
 
-// signedGet builds a v1 signed GET (signature over the bare timestamp).
-func (f *fixture) signedGet(path string, offset int64) *http.Request {
-	ts := f.ts(offset)
-	r := httptest.NewRequest(http.MethodGet, path, nil)
-	r.Header.Set(wire.HdrPublicKey, testPubB)
-	r.Header.Set(wire.HdrTimestamp, b64(ts))
-	r.Header.Set(wire.HdrSignature, b64(ed25519.Sign(testPriv, ts)))
+// nonce returns a fresh replay nonce (distinct per call, so same-second
+// requests never collide in the replay cache).
+func (f *fixture) nonce() []byte {
+	f.nseq++
+	n := make([]byte, 16)
+	binary.LittleEndian.PutUint64(n, uint64(f.nseq))
+
+	return n
+}
+
+// versioned stamps the protocol version onto a request.
+func (f *fixture) versioned(r *http.Request) *http.Request {
+	r.Header.Set(wire.HdrProtocolVersion, wire.ProtocolVersion)
 
 	return r
 }
 
-// signedPost builds a v1 POST: body b64(sig ‖ ts ‖ payload).
+// signedGet builds a signed GET: signature over method ‖ ts ‖ nonce.
+func (f *fixture) signedGet(path string, offset int64) *http.Request {
+	ts, n := f.ts(offset), f.nonce()
+	msg := append(append([]byte("GET"), ts...), n...)
+	r := httptest.NewRequest(http.MethodGet, path, nil)
+	r.Header.Set(wire.HdrPublicKey, testPubB)
+	r.Header.Set(wire.HdrTimestamp, b64(ts))
+	r.Header.Set(wire.HdrNonce, b64(n))
+	r.Header.Set(wire.HdrSignature, b64(ed25519.Sign(testPriv, msg)))
+
+	return f.versioned(r)
+}
+
+// signedPost builds a signed POST: body b64(sig ‖ ts ‖ payload) with the
+// signature over method ‖ ts ‖ nonce ‖ payload; the nonce rides as a
+// header.
 func (f *fixture) signedPost(path string, payload []byte, offset int64) *http.Request {
-	ts := f.ts(offset)
-	sig := ed25519.Sign(testPriv, append(append([]byte{}, ts...), payload...))
+	ts, n := f.ts(offset), f.nonce()
+	msg := append(append(append([]byte(http.MethodPost), ts...), n...), payload...)
+	sig := ed25519.Sign(testPriv, msg)
 	body := b64(append(append(append([]byte{}, sig...), ts...), payload...))
 	r := httptest.NewRequest(http.MethodPost, path, bytes.NewReader([]byte(body)))
 	r.Header.Set(wire.HdrPublicKey, testPubB)
+	r.Header.Set(wire.HdrNonce, b64(n))
 
-	return r
+	return f.versioned(r)
 }
 
 // serve routes the request to the handler the path belongs to, exactly as
@@ -171,21 +195,27 @@ func TestProfilesPostAndDelete(t *testing.T) {
 			t.Fatalf("precondition: got %d, want 200", w.Code)
 		}
 
-		ts := f.ts(0)
+		ts, n := f.ts(0), f.nonce()
+		msg := append(append([]byte(http.MethodDelete), ts...), n...)
 		del := httptest.NewRequest(http.MethodDelete, "/api/profiles/", nil)
 		del.Header.Set(wire.HdrPublicKey, testPubB)
 		del.Header.Set(wire.HdrTimestamp, b64(ts))
-		del.Header.Set(wire.HdrSignature, b64(ed25519.Sign(testPriv, ts)))
+		del.Header.Set(wire.HdrNonce, b64(n))
+		del.Header.Set(wire.HdrSignature, b64(ed25519.Sign(testPriv, msg)))
+		f.versioned(del)
 
 		if w := f.serve(del); w.Code != http.StatusOK {
 			t.Fatalf("first delete: got %d, want 200", w.Code)
 		}
 
-		ts2 := f.ts(0)
+		ts2, n2 := f.ts(0), f.nonce()
+		msg2 := append(append([]byte(http.MethodDelete), ts2...), n2...)
 		again := httptest.NewRequest(http.MethodDelete, "/api/profiles/", nil)
 		again.Header.Set(wire.HdrPublicKey, testPubB)
 		again.Header.Set(wire.HdrTimestamp, b64(ts2))
-		again.Header.Set(wire.HdrSignature, b64(ed25519.Sign(testPriv, ts2)))
+		again.Header.Set(wire.HdrNonce, b64(n2))
+		again.Header.Set(wire.HdrSignature, b64(ed25519.Sign(testPriv, msg2)))
+		f.versioned(again)
 
 		if w := f.serve(again); w.Code != http.StatusNoContent {
 			t.Fatalf("second delete: got %d, want 204", w.Code)
@@ -210,7 +240,7 @@ func TestCredentialsGetOrderOfChecks(t *testing.T) {
 		r.Header.Set(wire.HdrProtector, protector)
 		r.Header.Set(wire.HdrTimestamp, b64(f.ts(0)))
 
-		return r
+		return f.versioned(r)
 	}
 
 	t.Run("a known profile with the right factors gets entropy", func(t *testing.T) {
@@ -240,6 +270,7 @@ func TestCredentialsGetDoesNotCountUnknownProfiles(t *testing.T) {
 	r.Header.Set(wire.HdrHashedPin, b64([]byte("pin")))
 	r.Header.Set(wire.HdrProtector, b64(bytes.Repeat([]byte{1}, 32)))
 	r.Header.Set(wire.HdrTimestamp, b64(f.ts(0)))
+	f.versioned(r)
 
 	if w := f.serve(r); w.Code != http.StatusForbidden {
 		t.Fatalf("got %d, want 403", w.Code)
@@ -395,8 +426,9 @@ func TestTimestampWindowBoundaries(t *testing.T) {
 		{"now", 0, http.StatusNoContent},
 		{"just inside the past edge", -300, http.StatusNoContent},
 		{"just outside the past edge", -301, http.StatusBadRequest},
-		{"just inside the future edge (v1 is symmetric)", +300, http.StatusNoContent},
-		{"just outside the future edge", +301, http.StatusBadRequest},
+		{"edge of the future grace", +60, http.StatusNoContent},
+		{"just outside the future grace", +61, http.StatusBadRequest},
+		{"deep pre-issued", +300, http.StatusBadRequest},
 	}
 
 	for _, tc := range cases {

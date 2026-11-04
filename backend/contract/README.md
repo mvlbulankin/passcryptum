@@ -1,13 +1,14 @@
 # Contract tests (ADR-0002, ADR-0003)
 
-Wire-protocol contract tests — v1 in `contract_test.go`, v2 in
-`v2_test.go`. They pin what ANY backend must do: status codes, success
-bodies, and the documented v1 quirks (symmetric ±300 s timestamp window,
-unsigned credential GET/DELETE, 10-credential eviction, services overwrite
-without versioning). The v2 file pins the v2 edges: method-bound nonce
-signatures, replay on every signed request, and the window
-`−60 ≤ now − ts ≤ 300` including the 60 s future grace (ADR-0003,
-amendment 2026-10-28).
+Wire-protocol contract tests in `contract_test.go`. They pin what ANY
+backend must do: status codes, success bodies, and the documented quirks
+(unsigned credential GET/DELETE, 10-credential eviction, services overwrite
+without versioning). The suite also pins the protocol's security edges:
+method-bound nonce signatures, replay rejection on every signed request,
+the one-sided window `−60 ≤ now − ts ≤ 300` including the 60 s future
+grace (ADR-0003, amendment 2026-10-28), and the required
+`Protocol-Version: 2` header — the server speaks one protocol (ADR-0006;
+the older v1 serving is retired).
 
 This suite is the contract itself.
 
@@ -35,7 +36,8 @@ Any live backend (e.g. the docker-compose stack):
 
 ## Quirks deliberately pinned (do NOT "fix" without a protocol-version decision)
 
-- pre-issued (+299s) requests are accepted (fixed in v2, ADR-0003; v1 keeps it)
+- requests without `Protocol-Version: 2` are rejected (ADR-0006)
+- requests pre-issued more than 60 s ahead are rejected (ADR-0003 amendment)
 - `GET/DELETE /api/credentials/` carry no signature
 - `DELETE /api/credentials/` needs only Protector + Public-Key
 - services POST is an unversioned overwrite (stale replay reverts data)

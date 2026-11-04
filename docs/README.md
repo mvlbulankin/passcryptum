@@ -26,6 +26,7 @@ root [GLOSSARY](../GLOSSARY.md); work conventions for agents are in
 | [0003](adr/0003-protocol-v2.md) | Protocol v2: method-bound signatures with nonce, one-sided window, replay on all signed requests, client-side PIN KDF | accepted |
 | [0004](adr/0004-salt-less-origin-derivation.md) | Salt-less origin buffer derivation is accepted deliberately | accepted |
 | [0005](adr/0005-service-worker-updates.md) | App updates are pulled by `registration.update()` on launch; browser soft-updates (≤24 h throttle) are too slow to rely on | accepted |
+| [0006](adr/0006-protocol-v1-retirement.md) | The server speaks one wire protocol: `Protocol-Version: 2` required, v1 serving retired | accepted |
 
 New records: copy the shape of an existing one, number sequentially, and add
 the row above.

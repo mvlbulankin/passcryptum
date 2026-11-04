@@ -18,7 +18,8 @@ import (
 //go:embed web
 var webFS embed.FS
 
-// One recipe per endpoint×method: the frozen v1 contract (ADR-0002) as data.
+// One recipe per endpoint×method: the wire contract (ADR-0002, ADR-0003)
+// as data.
 var (
 	recProfilesGet = wire.Recipe{
 		Headers: []string{wire.HdrPublicKey, wire.HdrTimestamp, wire.HdrSignature},
@@ -30,7 +31,8 @@ var (
 	}
 	recProfilesDelete = recProfilesGet
 	recCredentialsGet = wire.Recipe{
-		// v1 quirk: unsigned — public key + factors + timestamp, no Signature.
+		// Unsigned — public key + factors + timestamp, no Signature
+		// (factor auth, ADR-0002).
 		Headers: []string{wire.HdrPublicKey, wire.HdrHashedPin, wire.HdrProtector, wire.HdrTimestamp},
 	}
 	recCredentialsPost = wire.Recipe{

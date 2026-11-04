@@ -4,6 +4,19 @@ All notable changes to Passcryptum. This project continues
 [nelkor/passcryptum](https://github.com/nelkor/passcryptum) (v2.1.4 was its
 last release).
 
+## 3.1.0
+
+### Changed
+
+- **One wire protocol.** The server now speaks a single protocol: every
+  request must carry `Protocol-Version: 2`, and anything else is a `400`
+  naming the header (ADR-0006). The older v1 serving — kept since 3.0 for
+  devices with cached pre-3.0 shells — is removed; current clients already
+  send the header on every request, so nothing changes for them. The
+  timestamp window (`−60 ≤ now − ts ≤ 300`), method-bound signatures and
+  replay protection are unchanged. The documentation now describes the one
+  protocol without version history.
+
 ## 3.0.1
 
 ### Fixed

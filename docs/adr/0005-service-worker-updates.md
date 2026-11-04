@@ -1,7 +1,9 @@
 # 0005. App updates are pulled by the app; browser soft-updates are too slow to rely on
 
 Date: 2026-10-18
-Status: accepted
+Status: accepted — the v1-serving holdover noted in Consequences is
+retired by [ADR-0006](0006-protocol-v1-retirement.md); the update
+mechanism stands.
 
 ## Context
 

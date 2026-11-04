@@ -38,10 +38,10 @@ the protector and the (hashed) PIN.
 
 ## Hashed PIN
 
-The value of the `Hashed-Pin` header. In protocol v1 — a single unsalted
-SHA-512 of the PIN. In v2 — `PBKDF2-SHA512(SHA-512(pin), salt = public key,
-600k iterations)`; the server additionally re-hashes what it receives with
-its own salt (the protector). The client enforces a minimum PIN length of 8.
+The value of the `Hashed-Pin` header:
+`PBKDF2-SHA512(SHA-512(pin), salt = public key, 600k iterations)`; the
+server additionally re-hashes what it receives with its own salt (the
+protector). The client enforces a minimum PIN length of 8.
 
 ## Services
 
@@ -59,23 +59,24 @@ the bytes between devices.
 
 ## Wire Protocol
 
-The frontend↔server protocol: base64 headers (`Public-Key`, `Hashed-Pin`,
-`Protector`, `Timestamp`, `Signature`, and `Nonce` in v2), bodies of
-`base64(signature ‖ 4-byte LE timestamp ‖ payload)`, four endpoints
-(`/api/profiles/`, `/api/credentials/`). GET/DELETE on credentials carry no
-signature at all (factors instead of a signature).
-
-Two versions ([ADR-0003](docs/adr/0003-protocol-v2.md)): **v1** — symmetric ±300 s window, signatures over
-`timestamp` (headers) / `ts ‖ payload` (bodies), replay protection on POST
-only. **v2** — requested via the `Protocol-Version: 2` header: signatures
-include the HTTP method and a per-request nonce
-(`method ‖ ts ‖ nonce` / `method ‖ ts ‖ nonce ‖ payload`), the
-window is one-sided with a 60 s future grace, `−60 ≤ now − ts ≤ 300`
-(ordinary clock drift passes; anything further from the future is still a
-pre-issued request), replay protection covers every
-signed request, and the wire Hashed-Pin is the client-side PBKDF2 (see
-Hashed PIN). The server speaks both; v1 stays for devices with cached older
-shells. Protocol versions are independent of product versions (2.x/3.x).
+The frontend↔server protocol. Every request carries `Protocol-Version: 2`
+(the only version the server speaks) and base64 headers (`Public-Key`,
+`Hashed-Pin`, `Protector`, `Timestamp`, plus `Signature` and `Nonce` on
+signed requests); bodies of `base64(signature ‖ 4-byte LE timestamp ‖
+payload)`. Signatures cover the HTTP method, the timestamp, a per-request
+nonce and (for bodies) the payload:
+`method ‖ ts ‖ nonce` / `method ‖ ts ‖ nonce ‖ payload`. Four endpoints
+(`/api/profiles/`, `/api/credentials/`); GET/DELETE on credentials carry
+no signature at all (factors instead of a signature). The timestamp window
+is one-sided with a 60 s future grace, `−60 ≤ now − ts ≤ 300` — ordinary
+client clock drift passes; anything further from the future is a
+pre-issued request — and replay protection covers every signed request.
+Semantic changes ship as a new version number negotiated by the header
+([ADR-0002](docs/adr/0002-wire-protocol-contract.md)); the current
+semantics are [ADR-0003](docs/adr/0003-protocol-v2.md) (there referred
+to as "v2"), and the older v1 serving was retired by
+[ADR-0006](docs/adr/0006-protocol-v1-retirement.md). Protocol versions
+are independent of product versions (2.x/3.x).
 
 ## Zero-Knowledge
 

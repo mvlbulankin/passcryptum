@@ -1,7 +1,8 @@
 # 0002. The Wire Protocol is a versioned public contract
 
 Date: 2026-10-18
-Status: accepted
+Status: accepted — the "v1 stays servable indefinitely" clause is retired
+by [ADR-0006](0006-protocol-v1-retirement.md); the rest stands.
 
 ## Context
 

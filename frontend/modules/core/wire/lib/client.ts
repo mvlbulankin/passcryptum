@@ -13,8 +13,9 @@ import {
 import { profilesUrl, credentialsUrl } from './urls'
 import type { Transport, WireClient, WireRequest } from './types'
 
-// Protocol v2 (ADR-0003): every request declares its version and every
-// signature binds the HTTP method — a captured GET can no longer be
+// The wire protocol (ADR-0002, ADR-0003): every request declares its
+// version — `Protocol-Version: 2`, the only one the server speaks — and
+// every signature binds the HTTP method, so a captured GET can no longer be
 // replayed as a DELETE, and the server's one-sided window applies.
 const protocolVersion = '2'
 
@@ -22,7 +23,7 @@ const versionHeaders = { 'Protocol-Version': protocolVersion }
 
 const methodBytes = (method: string) => new TextEncoder().encode(method)
 
-// v2 signed messages: method ‖ timestamp ‖ nonce (header recipes) and
+// Signed messages: method ‖ timestamp ‖ nonce (header recipes) and
 // method ‖ timestamp ‖ nonce ‖ payload (body recipes). The nonce is what
 // keeps two requests in the same second from sharing a signature.
 const headerMessage = (

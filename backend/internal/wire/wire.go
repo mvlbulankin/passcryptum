@@ -1,8 +1,10 @@
-// Package wire parses and verifies the Wire Protocol in both versions:
-// frozen v1 (ADR-0002) and v2 (ADR-0003, `Protocol-Version: 2` — method-bound
-// signatures, one-sided time window, replay rejection on every signed
-// request). Base64 headers, Ed25519 signatures over header-timestamp or body
-// framing b64(sig ‖ ts ‖ payload), replay rejection through the guard. Each
+// Package wire parses and verifies the Wire Protocol (ADR-0002; the
+// current semantics come from ADR-0003 — method-bound signatures with a
+// per-request nonce, the one-sided time window, replay rejection on every
+// signed request). Every request declares `Protocol-Version: 2`, the only
+// version the server speaks (ADR-0006 retired the older v1 serving).
+// Base64 headers, Ed25519 signatures over header-timestamp or body framing
+// b64(sig ‖ ts ‖ payload), replay rejection through the guard. Each
 // endpoint declares a Recipe; ParseRequest runs the shared pipeline so the
 // six handlers carry domain logic only.
 package wire
@@ -21,27 +23,35 @@ import (
 )
 
 const (
-	HdrPublicKey = "Public-Key"
-	HdrHashedPin = "Hashed-Pin"
-	HdrProtector = "Protector"
-	HdrTimestamp = "Timestamp"
-	HdrSignature = "Signature"
-	HdrNonce     = "Nonce"
+	HdrPublicKey       = "Public-Key"
+	HdrHashedPin       = "Hashed-Pin"
+	HdrProtector       = "Protector"
+	HdrTimestamp       = "Timestamp"
+	HdrSignature       = "Signature"
+	HdrNonce           = "Nonce"
+	HdrProtocolVersion = "Protocol-Version"
 )
 
-// nonceSize is the v2 replay nonce length (random per request, carried in
-// the signed message so same-second requests never share a signature).
+// ProtocolVersion is the only value HdrProtocolVersion accepts. The number
+// stays (ADR-0002: semantic changes ship as new versions negotiated by this
+// header); what ADR-0006 retired is serving any older one.
+const ProtocolVersion = "2"
+
+// nonceSize is the replay nonce length (random per request, carried in the
+// signed message so same-second requests never share a signature).
 const nonceSize = 16
 
-// TimestampTolerance is the protocol's ±300 s request window (ADR-0002).
+// TimestampTolerance is the backward half of the request window: now−ts
+// may lag at most 300 s (ADR-0002; the symmetric future half was closed by
+// ADR-0003).
 const TimestampTolerance = 300 * time.Second
 
-// FutureTolerance is the v2 grace for a client clock running ahead: v2
+// FutureTolerance is the grace for a client clock running ahead: the window
 // accepts −FutureTolerance ≤ now−ts ≤ TimestampTolerance (ADR-0003,
 // amendment 2026-10-28). Zero tolerance rejected real devices whose RTC had
 // drifted by a second; 60 s is the JWT ecosystem's canonical leeway and a
-// fifth of the backward window, so v2 stays far tighter than the symmetric
-// industry defaults.
+// fifth of the backward window, so the window stays far tighter than the
+// symmetric industry defaults.
 const FutureTolerance = 60 * time.Second
 
 // Recipe declares what an endpoint requires from the wire.
@@ -51,9 +61,8 @@ type Recipe struct {
 
 	// BodySigned marks POST mutations: the body is b64(sig(64) ‖ ts(4 LE) ‖
 	// payload), and exact resubmissions are rejected as replays. The
-	// signature covers ts ‖ payload in v1 and method ‖ ts ‖ payload in v2;
-	// otherwise the Signature header covers the Timestamp bytes (v2: with the
-	// method prefixed).
+	// signature covers method ‖ ts ‖ nonce ‖ payload; otherwise the
+	// Signature header covers method ‖ ts ‖ nonce.
 	BodySigned bool
 
 	// NeedsProfile makes the endpoint answer 403 for a key that was never
@@ -116,17 +125,17 @@ func WriteJSONString(w http.ResponseWriter, s string) {
 	w.Write(body)
 }
 
-// ParseRequest runs the shared pipeline for the recipe: header presence and
-// decoding, timestamp window, signature verification, body framing, and —
-// where the protocol version demands it — replay rejection. A nil Error
-// means the caller is cryptographically the profile it claims (the
-// profile's existence is the store's business, not the wire's).
+// ParseRequest runs the shared pipeline for the recipe: version
+// declaration, header presence and decoding, timestamp window, signature
+// verification, body framing, replay rejection. A nil Error means the
+// caller is cryptographically the profile it claims (the profile's
+// existence is the store's business, not the wire's).
 //
-// Versioning: requests carrying `Protocol-Version: 2` get the v2 semantics
-// (ADR-0003) — signatures bind the HTTP method, the timestamp window is
-// one-sided (0 <= now-ts <= 300), and replay rejection covers GET/DELETE
-// too. Without the header the frozen v1 behavior applies (ADR-0002), so
-// cached old frontends keep working while their service worker updates.
+// The server speaks one protocol (ADR-0006): every request must carry
+// `Protocol-Version: 2`, and the semantics are those of ADR-0003 —
+// signatures bind the HTTP method and a per-request nonce, the timestamp
+// window is one-sided with a 60 s future grace, and replay rejection covers
+// GET/DELETE too.
 func ParseRequest(r *http.Request, g *guard.Guard, rec Recipe) (*Auth, *Error) {
 	return ParseRequestWith(r, g, rec, Options{})
 }
@@ -152,9 +161,13 @@ func ParseRequestWith(
 		now = time.Now
 	}
 
+	if got := r.Header.Get(HdrProtocolVersion); got != ProtocolVersion {
+		return nil, errField(HdrProtocolVersion,
+			HdrProtocolVersion+" must be "+ProtocolVersion)
+	}
+
 	p := &pending{}
 	var timestamp, signature, nonce []byte
-	v2 := r.Header.Get("Protocol-Version") == "2"
 
 	for _, name := range rec.Headers {
 		v := r.Header.Get(name)
@@ -188,11 +201,13 @@ func ParseRequestWith(
 		}
 	}
 
-	// v2 requires a nonce on signed requests: it makes every request's
-	// signature unique, so the replay cache never rejects a legitimate second
-	// request within the same timestamp second. Unsigned credential requests
-	// keep their factor-auth quirk and carry no nonce.
-	if v2 && (signature != nil || rec.BodySigned) {
+	// Signed requests carry a nonce: it makes every request's signature
+	// unique, so the replay cache never rejects a legitimate second request
+	// within the same timestamp second. It is read here rather than via
+	// Recipe.Headers: the header is required by the protocol on signed
+	// requests, not declaratively by the endpoint. Unsigned credential
+	// requests keep their factor-auth quirk and carry no nonce.
+	if signature != nil || rec.BodySigned {
 		// Read it here rather than via Recipe.Headers: the header is required
 		// by the version, not declaratively by the endpoint.
 		if raw := r.Header.Get(HdrNonce); raw != "" {
@@ -216,32 +231,28 @@ func ParseRequestWith(
 	}
 
 	if rec.BodySigned {
-		return parseSignedBody(r, g, p, v2, now)
+		return parseSignedBody(r, g, p, now)
 	}
 
-	if err := checkTimestamp(timestamp, v2, now); err != nil {
+	if err := checkTimestamp(timestamp, now); err != nil {
 		return nil, err
 	}
 
-	// Recipes without HdrSignature (GET/DELETE /api/credentials/, the v1
+	// Recipes without HdrSignature (GET/DELETE /api/credentials/, the
 	// unsigned quirk) skip verification; presence is enforced above when the
-	// recipe lists the header. v2 binds the method into the signed message,
+	// recipe lists the header. The method is bound into the signed message,
 	// so a captured GET signature cannot be replayed as a DELETE.
 	if signature != nil {
-		msg := timestamp
-
-		if v2 {
-			msg = concat(concat([]byte(r.Method), timestamp), nonce)
-		}
+		msg := concat(concat([]byte(r.Method), timestamp), nonce)
 
 		if err := verify(p.publicKey, msg, signature); err != nil {
 			return nil, err
 		}
 	}
 
-	// v2: replay rejection covers GET/DELETE too — signatures now differ per
-	// request (fresh timestamp + nonce), so a repeat sighting is a replay.
-	if v2 && signature != nil &&
+	// Replay rejection covers GET/DELETE too — signatures differ per request
+	// (fresh timestamp + nonce), so a repeat sighting is a replay.
+	if signature != nil &&
 		g.RejectReplay(p.auth.PublicB64, replayBytes(signature, nonce)) {
 		return nil, &Error{Status: http.StatusForbidden, Reason: "replayed request"}
 	}
@@ -253,7 +264,6 @@ func parseSignedBody(
 	r *http.Request,
 	g *guard.Guard,
 	p *pending,
-	v2 bool,
 	now func() time.Time,
 ) (*Auth, *Error) {
 	body, err := readBody(r)
@@ -272,15 +282,11 @@ func parseSignedBody(
 
 	sig, tstamp, payload := raw[:64], raw[64:68], raw[68:]
 
-	if err := checkTimestamp(tstamp, v2, now); err != nil {
+	if err := checkTimestamp(tstamp, now); err != nil {
 		return nil, err
 	}
 
-	msg := concat(tstamp, payload)
-
-	if v2 {
-		msg = concat(concat(concat([]byte(r.Method), tstamp), p.nonce), payload)
-	}
+	msg := concat(concat(concat([]byte(r.Method), tstamp), p.nonce), payload)
 
 	if err := verify(p.publicKey, msg, sig); err != nil {
 		return nil, err
@@ -295,7 +301,7 @@ func parseSignedBody(
 	return &p.auth, nil
 }
 
-func checkTimestamp(raw []byte, oneSided bool, now func() time.Time) *Error {
+func checkTimestamp(raw []byte, now func() time.Time) *Error {
 	if len(raw) != 4 {
 		return errField(HdrTimestamp, "Malformed timestamp")
 	}
@@ -303,13 +309,11 @@ func checkTimestamp(raw []byte, oneSided bool, now func() time.Time) *Error {
 	t := int64(binary.LittleEndian.Uint32(raw))
 	d := now().Unix() - t
 
-	// v1: symmetric ±300 s (pre-issued requests accepted — pinned quirk).
-	// v2: one-sided with a 60 s future grace (ADR-0003 amendment): ordinary
-	// client clock drift passes, pre-issued requests beyond the grace stay
-	// rejected.
+	// One-sided window with a 60 s future grace (ADR-0003 amendment):
+	// ordinary client clock drift passes, pre-issued requests beyond the
+	// grace stay rejected.
 	bad := d > int64(TimestampTolerance/time.Second) ||
-		(oneSided && d < -int64(FutureTolerance/time.Second)) ||
-		(!oneSided && d < -int64(TimestampTolerance/time.Second))
+		d < -int64(FutureTolerance/time.Second)
 
 	if bad {
 		return errField(HdrTimestamp, "Invalid timestamp")
@@ -326,8 +330,9 @@ func verify(pub ed25519.PublicKey, msg, sig []byte) *Error {
 	return nil
 }
 
-// replayBytes is the v2 replay-cache key material: the signature already
-// covers the nonce, concatenating keeps the call sites honest.
+// replayBytes is the replay-cache key material for header-signed requests:
+// the signature already covers the nonce, concatenating keeps the call
+// sites honest.
 func replayBytes(signature, nonce []byte) []byte {
 	return concat(signature, nonce)
 }

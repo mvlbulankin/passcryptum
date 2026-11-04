@@ -45,7 +45,7 @@ const fakeTransport =
 // over method ‖ timestamp ‖ nonce. Verifies the framing from the protocol
 // spec, not by recomputing the client's internals.
 const expectSignedTimestampHeaders = (method: string) => {
-  // v2: the request declares its protocol version (ADR-0003)
+  // the request declares its protocol version (ADR-0003)
   expect(capturedRequest?.headers['Protocol-Version']).toBe('2')
 
   expect(capturedRequest?.headers['Public-Key']).toBe(b64(publicKey))
@@ -62,7 +62,7 @@ const expectSignedTimestampHeaders = (method: string) => {
 
   expect(sigBytes).toHaveLength(64)
 
-  // v2: the signature covers method ‖ timestamp ‖ nonce (ADR-0003)
+  // the signature covers method ‖ timestamp ‖ nonce (ADR-0003)
   const nonce = fromB64(capturedRequest!.headers.Nonce)
 
   expect(nonce).toHaveLength(16)
@@ -74,8 +74,8 @@ const expectSignedTimestampHeaders = (method: string) => {
 
 const methodBytes = (method: string) => new TextEncoder().encode(method)
 
-// The POST body recipe: b64(sig(64) ‖ ts(4 LE) ‖ payload), v2 signature over
-// method ‖ ts ‖ payload.
+// The POST body recipe: b64(sig(64) ‖ ts(4 LE) ‖ payload), signature over
+// method ‖ ts ‖ nonce ‖ payload.
 const expectSignedBodyFraming = (method: string, payload: Uint8Array) => {
   expect(capturedRequest?.headers['Protocol-Version']).toBe('2')
 
@@ -89,7 +89,7 @@ const expectSignedBodyFraming = (method: string, payload: Uint8Array) => {
 
   expect(sent).toEqual(payload)
 
-  // v2: the signature covers method ‖ ts ‖ nonce ‖ payload
+  // the signature covers method ‖ ts ‖ nonce ‖ payload
   const nonce = fromB64(capturedRequest!.headers.Nonce)
 
   expect(nonce).toHaveLength(16)
@@ -200,7 +200,7 @@ describe('Wire Protocol client — getEntropy', () => {
     expect(capturedRequest?.method).toBe('GET')
     expect(capturedRequest?.url).toMatch(/\/api\/credentials\/$/)
 
-    // All four factors as headers — and no signature (v1 quirk: unsigned)
+    // All four factors as headers — and no signature (factor auth)
     expect(capturedRequest?.headers['Public-Key']).toBe(b64(publicKey))
     expect(capturedRequest?.headers['Hashed-Pin']).toBe(b64(hashedPin))
     expect(capturedRequest?.headers.Protector).toBe(b64(protector))

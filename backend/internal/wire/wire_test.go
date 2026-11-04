@@ -30,13 +30,13 @@ func tsOffset(sec int64) []byte {
 	return b
 }
 
-func request(headers map[string]string, body []byte) *http.Request {
+func request(method string, headers map[string]string, body []byte) *http.Request {
 	var rdr io.Reader
 	if body != nil {
 		rdr = bytes.NewReader(body)
 	}
 
-	r := httptest.NewRequest("POST", "/api/x/", rdr)
+	r := httptest.NewRequest(method, "/api/x/", rdr)
 	for k, v := range headers {
 		r.Header.Set(k, v)
 	}
@@ -45,8 +45,7 @@ func request(headers map[string]string, body []byte) *http.Request {
 }
 
 var profilesGet = Recipe{
-	Headers:    []string{HdrPublicKey, HdrTimestamp, HdrSignature},
-	BodySigned: false,
+	Headers: []string{HdrPublicKey, HdrTimestamp, HdrSignature},
 }
 
 var profilesPost = Recipe{
@@ -55,34 +54,85 @@ var profilesPost = Recipe{
 }
 
 var profilesDelete = Recipe{
-	Headers:    []string{HdrPublicKey, HdrTimestamp, HdrSignature},
-	BodySigned: false,
+	Headers: []string{HdrPublicKey, HdrTimestamp, HdrSignature},
 }
 
 var credentialsGet = Recipe{
-	Headers:    []string{HdrPublicKey, HdrHashedPin, HdrProtector, HdrTimestamp},
-	BodySigned: false,
+	Headers: []string{HdrPublicKey, HdrHashedPin, HdrProtector, HdrTimestamp},
 }
 
-func signedHeaders(ts []byte) map[string]string {
+// nonce returns a replay nonce with a distinct first byte per call.
+func nonce(seedByte byte) []byte {
+	n := make([]byte, nonceSize)
+	n[0] = seedByte
+	for i := 1; i < nonceSize; i++ {
+		n[i] = byte(i)
+	}
+
+	return n
+}
+
+// signedMessage is the signed message for header recipes: method ‖ ts ‖ nonce.
+func signedMessage(method string, ts, n []byte) []byte {
+	return concat(concat([]byte(method), ts), n)
+}
+
+// signedHeaders builds a valid signed header set for the given method. The
+// seed bytes keep calls distinct so same-second requests never collide in
+// the replay cache.
+func signedHeaders(method string, ts []byte, nonceSeed byte) map[string]string {
+	n := nonce(nonceSeed)
+
 	return map[string]string{
-		HdrPublicKey: pubB64,
-		HdrTimestamp: b64(ts),
-		HdrSignature: b64(ed25519.Sign(priv, ts)),
+		HdrProtocolVersion: ProtocolVersion,
+		HdrPublicKey:       pubB64,
+		HdrTimestamp:       b64(ts),
+		HdrNonce:           b64(n),
+		HdrSignature:       b64(ed25519.Sign(priv, signedMessage(method, ts, n))),
 	}
 }
 
-// signedBody builds b64(sig ‖ ts ‖ payload) with the sig over ts ‖ payload.
-func signedBody(ts, payload []byte) []byte {
-	msg := append(append([]byte{}, ts...), payload...)
+// signedBody builds b64(sig ‖ ts ‖ payload) with the sig over
+// method ‖ ts ‖ nonce ‖ payload. The nonce rides as a header, not inside
+// the framing.
+func signedBody(method string, ts, payload, n []byte) []byte {
+	msg := concat(signedMessage(method, ts, n), payload)
 	sig := ed25519.Sign(priv, msg)
-	raw := append(append(append([]byte{}, sig...), ts...), payload...)
 
-	return []byte(b64(raw))
+	return []byte(b64(concat(concat(sig, ts), payload)))
 }
 
-func TestHeaderRecipeVerifiesSignatureOverTimestamp(t *testing.T) {
-	r := request(signedHeaders(tsNow), nil)
+// The server speaks one protocol: every request must declare it. Anything
+// else is rejected before any other parsing touches the request.
+func TestVersionHeaderRequired(t *testing.T) {
+	cases := []struct {
+		name   string
+		header string
+	}{
+		{"missing header", ""},
+		{"v1 value", "1"},
+		{"unknown value", "3"},
+		{"garbage", "two"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			headers := signedHeaders("GET", tsNow, 1)
+			delete(headers, HdrProtocolVersion)
+			if tc.header != "" {
+				headers[HdrProtocolVersion] = tc.header
+			}
+
+			_, err := ParseRequest(request("GET", headers, nil), realGuard(), profilesGet)
+			if err == nil || err.Field != HdrProtocolVersion || err.Status != http.StatusBadRequest {
+				t.Fatalf("got %+v, want 400 on %s", err, HdrProtocolVersion)
+			}
+		})
+	}
+}
+
+func TestHeaderRecipeVerifiesSignatureOverMethodTimestampNonce(t *testing.T) {
+	r := request("GET", signedHeaders("GET", tsNow, 2), nil)
 
 	auth, err := ParseRequest(r, realGuard(), profilesGet)
 	if err != nil {
@@ -96,32 +146,48 @@ func TestHeaderRecipeVerifiesSignatureOverTimestamp(t *testing.T) {
 
 func TestHeaderRecipeRejections(t *testing.T) {
 	cases := []struct {
-		name    string
-		headers map[string]string
-		field   string
+		name   string
+		mutate func(map[string]string)
+		field  string
 	}{
-		{"missing Timestamp", map[string]string{
-			HdrPublicKey: pubB64, HdrSignature: b64(ed25519.Sign(priv, tsNow))}, HdrTimestamp},
-		{"malformed base64", map[string]string{
-			HdrPublicKey: "!!!", HdrTimestamp: b64(tsNow), HdrSignature: b64(ed25519.Sign(priv, tsNow))}, HdrPublicKey},
-		{"wrong-length Public-Key", map[string]string{
-			HdrPublicKey: b64(bytes.Repeat([]byte{1}, 20)), HdrTimestamp: b64(tsNow), HdrSignature: b64(ed25519.Sign(priv, tsNow))}, HdrPublicKey},
-		{"stale timestamp", map[string]string{
-			HdrPublicKey: pubB64, HdrTimestamp: b64(tsOffset(-400)),
-			HdrSignature: func() string {
-				old := tsOffset(-400)
-				return b64(ed25519.Sign(priv, old))
-			}()}, HdrTimestamp},
-		{"invalid signature", map[string]string{
-			HdrPublicKey: pubB64, HdrTimestamp: b64(tsNow),
-			HdrSignature: b64(ed25519.Sign(priv, []byte("WRONG")))}, HdrSignature},
+		{"missing Timestamp", func(h map[string]string) {
+			delete(h, HdrTimestamp)
+		}, HdrTimestamp},
+		{"malformed base64", func(h map[string]string) {
+			h[HdrPublicKey] = "!!!"
+		}, HdrPublicKey},
+		{"wrong-length Public-Key", func(h map[string]string) {
+			h[HdrPublicKey] = b64(bytes.Repeat([]byte{1}, 20))
+		}, HdrPublicKey},
+		{"stale timestamp", func(h map[string]string) {
+			old := tsOffset(-400)
+			h[HdrTimestamp] = b64(old)
+			h[HdrSignature] = b64(ed25519.Sign(priv, signedMessage("GET", old, nonce(3))))
+		}, HdrTimestamp},
+		{"pre-issued timestamp", func(h map[string]string) {
+			future := tsOffset(299)
+			h[HdrTimestamp] = b64(future)
+			h[HdrSignature] = b64(ed25519.Sign(priv, signedMessage("GET", future, nonce(3))))
+		}, HdrTimestamp},
+		{"invalid signature", func(h map[string]string) {
+			h[HdrSignature] = b64(ed25519.Sign(priv, []byte("WRONG")))
+		}, HdrSignature},
+		{"missing nonce", func(h map[string]string) {
+			delete(h, HdrNonce)
+		}, HdrNonce},
+		{"wrong-length nonce", func(h map[string]string) {
+			h[HdrNonce] = b64(bytes.Repeat([]byte{9}, 15))
+			// The signature still verifies over the original nonce bytes;
+			// the length check must fire regardless.
+		}, HdrNonce},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := request(tc.headers, nil)
+			headers := signedHeaders("GET", tsNow, 3)
+			tc.mutate(headers)
 
-			_, err := ParseRequest(r, realGuard(), profilesGet)
+			_, err := ParseRequest(request("GET", headers, nil), realGuard(), profilesGet)
 			if err == nil {
 				t.Fatal("must reject")
 			}
@@ -137,12 +203,56 @@ func TestHeaderRecipeRejections(t *testing.T) {
 	}
 }
 
+// The 60 s future grace (ADR-0003 amendment): a client clock running ahead
+// by an ordinary amount passes; anything beyond the grace is pre-issued and
+// rejected.
+func TestFutureGraceWindow(t *testing.T) {
+	cases := []struct {
+		name   string
+		offset int64
+		reject bool
+	}{
+		{"30 s ahead is ordinary clock drift", 30, false},
+		{"60 s ahead is the edge of the grace", 60, false},
+		{"61 s ahead is pre-issued", 61, true},
+		{"299 s ahead is pre-issued", 299, true},
+	}
+
+	for i, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := tsOffset(tc.offset)
+			headers := signedHeaders("GET", ts, byte(10+i))
+
+			_, err := ParseRequest(request("GET", headers, nil), realGuard(), profilesGet)
+			if tc.reject && (err == nil || err.Field != HdrTimestamp) {
+				t.Fatalf("offset +%d: want timestamp rejection, got %+v", tc.offset, err)
+			}
+
+			if !tc.reject && err != nil {
+				t.Fatalf("offset +%d: must pass under the grace, got %v", tc.offset, err)
+			}
+		})
+	}
+}
+
+// A captured GET signature must not verify as a DELETE: the method is bound
+// into the signed message.
+func TestSignatureBindsMethod(t *testing.T) {
+	r2 := request("DELETE", signedHeaders("GET", tsNow, 4), nil)
+
+	_, err := ParseRequest(r2, realGuard(), profilesDelete)
+	if err == nil || err.Field != HdrSignature {
+		t.Fatalf("captured GET replayed as DELETE must fail signature, got %+v", err)
+	}
+}
+
 func TestUnsignedCredentialRecipeNeedsNoSignature(t *testing.T) {
-	r := request(map[string]string{
-		HdrPublicKey: pubB64,
-		HdrHashedPin: b64([]byte("pin-hash")),
-		HdrProtector: b64(bytes.Repeat([]byte{2}, 32)),
-		HdrTimestamp: b64(tsNow),
+	r := request("GET", map[string]string{
+		HdrProtocolVersion: ProtocolVersion,
+		HdrPublicKey:       pubB64,
+		HdrHashedPin:       b64([]byte("pin-hash")),
+		HdrProtector:       b64(bytes.Repeat([]byte{2}, 32)),
+		HdrTimestamp:       b64(tsNow),
 	}, nil)
 
 	auth, err := ParseRequest(r, realGuard(), credentialsGet)
@@ -157,7 +267,12 @@ func TestUnsignedCredentialRecipeNeedsNoSignature(t *testing.T) {
 
 func TestBodyRecipeVerifiesFramingAndReturnsPayload(t *testing.T) {
 	payload := []byte(`{"services":{}}`)
-	r := request(map[string]string{HdrPublicKey: pubB64}, signedBody(tsNow, payload))
+	n := nonce(5)
+	r := request("POST", map[string]string{
+		HdrProtocolVersion: ProtocolVersion,
+		HdrPublicKey:       pubB64,
+		HdrNonce:           b64(n),
+	}, signedBody("POST", tsNow, payload, n))
 
 	auth, err := ParseRequest(r, realGuard(), profilesPost)
 	if err != nil {
@@ -170,37 +285,23 @@ func TestBodyRecipeVerifiesFramingAndReturnsPayload(t *testing.T) {
 }
 
 func TestBodyRecipeRejections(t *testing.T) {
-	cases := []struct {
-		name   string
-		body   []byte
-		field  string
-		status int
-	}{
-		{"empty body", []byte(""), "Body", 400},
-		{"not base64", []byte("!!!"), "Body", 400},
-		{"too short", []byte(b64(bytes.Repeat([]byte{0}, 67))), "Body", 400},
+	headers := func(n []byte) map[string]string {
+		return map[string]string{
+			HdrProtocolVersion: ProtocolVersion,
+			HdrPublicKey:       pubB64,
+			HdrNonce:           b64(n),
+		}
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			r := request(map[string]string{HdrPublicKey: pubB64}, tc.body)
-
-			_, err := ParseRequest(r, realGuard(), profilesPost)
-			if err == nil || err.Field != tc.field || err.Status != tc.status {
-				t.Fatalf("got %+v, want field=%s status=%d", err, tc.field, tc.status)
-			}
-		})
-	}
-
-	// The exact contract messages: empty vs short bodies differ.
 	for _, tc := range []struct {
 		body []byte
 		msg  string
 	}{
 		{[]byte(""), "Body is required"},
+		{[]byte("!!!"), "Invalid Body format"},
 		{[]byte(b64(bytes.Repeat([]byte{0}, 67))), "Body is too short"},
 	} {
-		r := request(map[string]string{HdrPublicKey: pubB64}, tc.body)
+		r := request("POST", headers(nonce(6)), tc.body)
 
 		_, err := ParseRequest(r, realGuard(), profilesPost)
 		if err == nil || err.Msg != tc.msg {
@@ -210,7 +311,8 @@ func TestBodyRecipeRejections(t *testing.T) {
 
 	t.Run("stale body timestamp", func(t *testing.T) {
 		old := tsOffset(-400)
-		r := request(map[string]string{HdrPublicKey: pubB64}, signedBody(old, []byte("X")))
+		n := nonce(6)
+		r := request("POST", headers(n), signedBody("POST", old, []byte("X"), n))
 
 		_, err := ParseRequest(r, realGuard(), profilesPost)
 		if err == nil || err.Field != HdrTimestamp {
@@ -219,255 +321,86 @@ func TestBodyRecipeRejections(t *testing.T) {
 	})
 
 	t.Run("signature over wrong message", func(t *testing.T) {
-		ts := tsNow
-		sig := ed25519.Sign(priv, append(append([]byte{}, ts...), []byte("OTHER")...))
-		raw := append(append(append([]byte{}, sig...), ts...), []byte("X")...)
+		n := nonce(6)
+		sig := ed25519.Sign(priv, signedMessage("POST", tsNow, n))
+		raw := append(append(append([]byte{}, sig...), tsNow...), []byte("OTHER")...)
 
-		r := request(map[string]string{HdrPublicKey: pubB64}, []byte(b64(raw)))
+		r := request("POST", headers(n), []byte(b64(raw)))
 
 		_, err := ParseRequest(r, realGuard(), profilesPost)
 		if err == nil || err.Field != HdrSignature {
 			t.Fatalf("got %+v, want signature error", err)
 		}
 	})
+
+	t.Run("signature without the nonce bound in", func(t *testing.T) {
+		// ts ‖ payload alone (the retired pre-nonce message) must fail.
+		n := nonce(6)
+		sig := ed25519.Sign(priv, concat(tsNow, []byte("X")))
+		raw := append(append(append([]byte{}, sig...), tsNow...), []byte("X")...)
+
+		r := request("POST", headers(n), []byte(b64(raw)))
+
+		_, err := ParseRequest(r, realGuard(), profilesPost)
+		if err == nil {
+			t.Fatal("must reject a signature that does not cover the nonce")
+		}
+	})
 }
 
 func TestBodyRecipeRejectsReplay(t *testing.T) {
 	g := realGuard()
-	body := signedBody(tsNow, []byte("X"))
+	n := nonce(7)
+	body := signedBody("POST", tsNow, []byte("X"), n)
+	h := map[string]string{
+		HdrProtocolVersion: ProtocolVersion,
+		HdrPublicKey:       pubB64,
+		HdrNonce:           b64(n),
+	}
 
-	r1 := request(map[string]string{HdrPublicKey: pubB64}, body)
+	r1 := request("POST", h, body)
 	if _, err := ParseRequest(r1, g, profilesPost); err != nil {
 		t.Fatalf("first sighting must pass: %v", err)
 	}
 
-	r2 := request(map[string]string{HdrPublicKey: pubB64}, body)
+	r2 := request("POST", h, body)
 	_, err := ParseRequest(r2, g, profilesPost)
 	if err == nil || err.Status != http.StatusForbidden {
 		t.Fatalf("replayed POST must be 403, got %+v", err)
 	}
 }
 
-// --- protocol v2 (Protocol-Version: 2) -------------------------------------
-// v2: signatures bind the HTTP method, the time window is one-sided
-// (0 <= now-ts <= 300), and replay rejection covers GET/DELETE too.
-
-func v2Headers(ts []byte, method string) map[string]string {
-	nonce := v2Nonce()
-
-	return map[string]string{
-		HdrPublicKey:       pubB64,
-		HdrTimestamp:       b64(ts),
-		HdrNonce:           b64(nonce),
-		HdrSignature:       b64(ed25519.Sign(priv, v2Message(method, ts, nonce, nil))),
-		"Protocol-Version": "2",
-	}
-}
-
-// v2Message: method ‖ ts ‖ nonce ‖ payload.
-func v2Message(method string, ts, nonce, payload []byte) []byte {
-	out := append([]byte{}, []byte(method)...)
-	out = append(out, ts...)
-	out = append(out, nonce...)
-
-	return append(out, payload...)
-}
-
-func v2Nonce() []byte {
-	n := make([]byte, nonceSize)
-	for i := range n {
-		n[i] = byte(i + 1)
-	}
-
-	return n
-}
-
-func signedMessage(method string, ts, payload []byte) []byte {
-	m := append([]byte{}, []byte(method)...)
-	m = append(m, ts...)
-
-	return append(m, payload...)
-}
-
-func TestV2SignatureBindsMethod(t *testing.T) {
-	r := httptest.NewRequest("GET", "/api/profiles/", nil)
-	for k, v := range v2Headers(tsNow, "GET") {
-		r.Header.Set(k, v)
-	}
-
-	if _, err := ParseRequest(r, realGuard(), profilesGet); err != nil {
-		t.Fatalf("v2 GET with method-bound signature must parse: %v", err)
-	}
-
-	// Same headers against DELETE: the signature no longer matches the
-	// method — a captured GET must not be replayable as DELETE.
-	r2 := httptest.NewRequest("DELETE", "/api/profiles/", nil)
-	for k, v := range v2Headers(tsNow, "GET") {
-		r2.Header.Set(k, v)
-	}
-
-	_, err := ParseRequest(r2, realGuard(), profilesDelete)
-	if err == nil || err.Field != HdrSignature {
-		t.Fatalf("v2 captured GET replayed as DELETE must fail signature, got %+v", err)
-	}
-}
-
-func TestV2OneSidedWindow(t *testing.T) {
-	preIssued := tsOffset(299) // accepted in v1 (quirk), must be rejected in v2
-
-	r := httptest.NewRequest("GET", "/api/profiles/", nil)
-	for k, v := range v2Headers(preIssued, "GET") {
-		r.Header.Set(k, v)
-	}
-
-	_, err := ParseRequest(r, realGuard(), profilesGet)
-	if err == nil || err.Field != HdrTimestamp {
-		t.Fatalf("v2 must reject pre-issued timestamps, got %+v", err)
-	}
-
-	// Same offset still accepted under v1 (contract quirk pinned).
-	v1 := signedHeaders(preIssued)
-	r1 := httptest.NewRequest("GET", "/api/profiles/", nil)
-	for k, v := range v1 {
-		r1.Header.Set(k, v)
-	}
-
-	if _, err := ParseRequest(r1, realGuard(), profilesGet); err != nil {
-		t.Fatalf("v1 must keep accepting pre-issued requests: %v", err)
-	}
-}
-
-// ADR-0003 amendment: v2 tolerates a client clock up to FutureTolerance
-// ahead — zero tolerance rejected real devices with ordinary RTC drift —
-// while any larger future offset keeps the pre-issuance rejection.
-func TestV2FutureGraceWindow(t *testing.T) {
-	cases := []struct {
-		name   string
-		offset int64
-		reject bool
-	}{
-		{"30 s ahead is ordinary clock drift", 30, false},
-		{"60 s ahead is the edge of the grace", 60, false},
-		{"61 s ahead is pre-issued", 61, true},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			ts := tsOffset(tc.offset)
-			r := httptest.NewRequest("GET", "/api/profiles/", nil)
-			for k, v := range v2Headers(ts, "GET") {
-				r.Header.Set(k, v)
-			}
-
-			_, err := ParseRequest(r, realGuard(), profilesGet)
-			if tc.reject && (err == nil || err.Field != HdrTimestamp) {
-				t.Fatalf("offset +%d: want timestamp rejection, got %+v", tc.offset, err)
-			}
-
-			if !tc.reject && err != nil {
-				t.Fatalf("offset +%d: must pass under the grace, got %v", tc.offset, err)
-			}
-		})
-	}
-}
-
-func TestV2RejectsGETReplay(t *testing.T) {
+// Replay rejection covers GET/DELETE too: the per-request nonce makes every
+// legitimate signature unique, so a repeat sighting is always a replay.
+func TestHeaderRecipeRejectsReplay(t *testing.T) {
 	g := realGuard()
 
-	for _, method := range []string{"GET", "DELETE"} {
-		r := httptest.NewRequest(method, "/api/profiles/", nil)
-		for k, v := range v2Headers(tsNow, method) {
-			r.Header.Set(k, v)
-		}
+	for i, method := range []string{"GET", "DELETE"} {
+		h := signedHeaders(method, tsNow, byte(20+i))
+		r1 := request(method, h, nil)
 
-		if _, err := ParseRequest(r, g, profilesGet); err != nil {
+		if _, err := ParseRequest(r1, g, profilesGet); err != nil {
 			t.Fatalf("%s first sighting must pass: %v", method, err)
 		}
 
-		// Exact resubmission of the same signed headers.
-		r2 := httptest.NewRequest(method, "/api/profiles/", nil)
-		for k, v := range v2Headers(tsNow, method) {
-			r2.Header.Set(k, v)
-		}
-
+		r2 := request(method, h, nil)
 		_, err := ParseRequest(r2, g, profilesGet)
 		if err == nil || err.Status != http.StatusForbidden {
-			t.Fatalf("v2 replayed %s must be 403, got %+v", method, err)
+			t.Fatalf("replayed %s must be 403, got %+v", method, err)
 		}
-	}
-}
-
-func TestV2BodySignatureBindsMethod(t *testing.T) {
-	payload := []byte("X")
-	ts := tsNow
-
-	nonce := v2Nonce()
-
-	body := func(sigMsg []byte) []byte {
-		sig := ed25519.Sign(priv, sigMsg)
-		raw := append(append(append([]byte{}, sig...), ts...), payload...)
-
-		return []byte(b64(raw))
-	}
-
-	// Correct v2 body: signature over method ‖ ts ‖ nonce ‖ payload.
-	r := httptest.NewRequest("POST", "/api/profiles/", bytes.NewReader(body(v2Message("POST", ts, nonce, payload))))
-	r.Header.Set(HdrPublicKey, pubB64)
-	r.Header.Set(HdrNonce, b64(nonce))
-	r.Header.Set("Protocol-Version", "2")
-
-	if _, err := ParseRequest(r, realGuard(), profilesPost); err != nil {
-		t.Fatalf("v2 POST with method-bound body signature must parse: %v", err)
-	}
-
-	// v1-style body signature (over ts ‖ payload only) must fail in v2.
-	r2 := httptest.NewRequest("POST", "/api/profiles/", bytes.NewReader(body(signedMessage("", ts, payload))))
-	r2.Header.Set(HdrPublicKey, pubB64)
-	r2.Header.Set(HdrNonce, b64(nonce))
-	r2.Header.Set("Protocol-Version", "2")
-
-	if _, err := ParseRequest(r2, realGuard(), profilesPost); err == nil {
-		t.Fatal("v2 must reject a body signature that does not bind the method")
 	}
 }
 
 // Regression: two identical requests in the same second used to share a
 // signature and trip the replay cache (a double GET failed the second time).
-func TestV2NonceMakesSameSecondRequestsDistinct(t *testing.T) {
+func TestNonceMakesSameSecondRequestsDistinct(t *testing.T) {
 	g := realGuard()
-	ts := tsNow
 
 	for i := 0; i < 3; i++ {
-		r := httptest.NewRequest("GET", "/api/profiles/", nil)
-		nonce := make([]byte, nonceSize)
-		nonce[0] = byte(i + 1) // a different nonce per request
-
-		for k, v := range map[string]string{
-			HdrPublicKey:       pubB64,
-			HdrTimestamp:       b64(ts),
-			HdrNonce:           b64(nonce),
-			HdrSignature:       b64(ed25519.Sign(priv, v2Message("GET", ts, nonce, nil))),
-			"Protocol-Version": "2",
-		} {
-			r.Header.Set(k, v)
-		}
+		r := request("GET", signedHeaders("GET", tsNow, byte(30+i)), nil)
 
 		if _, err := ParseRequest(r, g, profilesGet); err != nil {
 			t.Fatalf("request %d with a fresh nonce must pass: %v", i+1, err)
 		}
-	}
-}
-
-func TestV2RequiresNonce(t *testing.T) {
-	r := httptest.NewRequest("GET", "/api/profiles/", nil)
-	for k, v := range v2Headers(tsNow, "GET") {
-		if k != HdrNonce {
-			r.Header.Set(k, v)
-		}
-	}
-
-	_, err := ParseRequest(r, realGuard(), profilesGet)
-	if err == nil || err.Field != HdrNonce || err.Status != 400 {
-		t.Fatalf("v2 without a nonce must be a 400 on Nonce, got %+v", err)
 	}
 }

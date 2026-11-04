@@ -1,5 +1,5 @@
 // Wire Protocol client — the single place the frontend speaks the protocol
-// (ADR-0002), in its current version v2 (ADR-0003). Interface: six endpoint
+// (ADR-0002; current semantics ADR-0003). Interface: six endpoint
 // functions + WireError. Everything
 // else (base64 headers, framing, signing, URLs, transport) is implementation.
 

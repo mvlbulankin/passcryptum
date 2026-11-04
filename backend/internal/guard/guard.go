@@ -100,9 +100,11 @@ func (g *Guard) AllowIP(ip string) bool {
 	return true
 }
 
-// RejectReplay applies to POST endpoints only (mutations). GETs are
-// repeatable by design (v1 contract); protocol v2 (ADR-0003) extends replay
-// protection to every signed request.
+// RejectReplay applies to every signed request (ADR-0003): the
+// per-request nonce makes each signature unique, so a repeat sighting is
+// always a replay. Body recipes key by the signature alone (it covers the
+// nonce); header recipes key by signature ‖ nonce. Unsigned credential
+// requests carry no signature and therefore no replay key.
 func (g *Guard) RejectReplay(pubB64 string, sig []byte) bool {
 	key := replayKey(pubB64, sig)
 

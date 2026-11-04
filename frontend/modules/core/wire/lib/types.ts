@@ -26,9 +26,9 @@ export type WireClient = {
   // DELETE /api/profiles/ — 'cleared' when a blob was removed, 'already-empty' on 204
   clearServices(keyPairSeed: Uint8Array): Promise<'cleared' | 'already-empty'>
 
-  // GET /api/credentials/ — unsigned (v1 quirk): public key + hashed PIN +
-  // protector + timestamp. Takes the public key directly: this runs before a
-  // session exists (PIN login fetches the entropy to start one).
+  // GET /api/credentials/ — unsigned (factor auth, ADR-0002): public key +
+  // hashed PIN + protector + timestamp. Takes the public key directly: this
+  // runs before a session exists (PIN login fetches the entropy to start one).
   getEntropy(
     publicKey: Uint8Array,
     hashedPin: Uint8Array,
@@ -43,7 +43,7 @@ export type WireClient = {
     entropy: Uint8Array,
   ): Promise<Uint8Array>
 
-  // DELETE /api/credentials/ — unsigned (v1 quirk): protector + public key +
-  // timestamp suffice. Like getEntropy, runs without a session.
+  // DELETE /api/credentials/ — unsigned (factor auth, ADR-0002): protector +
+  // public key + timestamp suffice. Like getEntropy, runs without a session.
   deleteCredential(publicKey: Uint8Array, protector: Uint8Array): Promise<void>
 }

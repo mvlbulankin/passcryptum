@@ -41,8 +41,9 @@ backend is a versioned public contract pinned by contract tests
 ([backend/contract](backend/contract/README.md)).
 
 **Versioning note:** the protocol is versioned by the `Protocol-Version`
-header (`2` today; requests without it get the v1 behaviour). Protocol
-versions are independent of product versions (2.x → 3.x).
+header; the server speaks version `2` only, and every request carries it —
+anything else is rejected (ADR-0006). Protocol versions are independent of
+product versions (2.x → 3.x).
 
 ## Documentation
 
@@ -55,10 +56,9 @@ versions are independent of product versions (2.x → 3.x).
 ## Deploy
 
 1. Any server with Docker. Requests carry a unix timestamp, so keep the
-   clock synced (NTP): the server enforces `−60 ≤ now − ts ≤ 300` in
-   protocol v2 — a client clock may run up to a minute fast; anything
-   further from the future is rejected as pre-issued (ADR-0003) — and a
-   symmetric ±300 s window in v1.
+   clock synced (NTP): the server enforces `−60 ≤ now − ts ≤ 300` —
+   a client clock may run up to a minute fast; anything further from the
+   future is rejected as pre-issued (ADR-0003).
 2. Put your domain into `gateway/Caddyfile` — Caddy obtains and renews the
    certificate automatically (no certbot).
 3. Build and run:
