@@ -195,6 +195,16 @@ describe('Vault', () => {
     expect(await vault.importText('not json, not hex')).toBeNull()
   })
 
+  it('exportText is the stored representation, and importText reads it back', async () => {
+    await vault.write(services('b.com'))
+
+    const copied = await vault.exportText()
+
+    // Exactly what the app stores, so the round-trip closes.
+    expect(copied).toBe(storage.getItem('test-vault'))
+    expect(await vault.importText(copied as string)).toEqual(services('b.com'))
+  })
+
   it('clears the stored vault', async () => {
     await vault.write(services('a.com'))
     await vault.clear()

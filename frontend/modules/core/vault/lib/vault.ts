@@ -81,6 +81,14 @@ export const createVault = (
     return hex ? new Uint8Array(fromHex(hex)) : null
   }
 
+  const exportText = async (): Promise<string | null> => {
+    assertOpen()
+
+    // Bone in the storage representation: this is the value importText
+    // reads back, so a copied vault round-trips.
+    return storage.getItem(session.lsKey)
+  }
+
   const importBytes = async (
     bytes: ArrayBuffer,
   ): Promise<ServicesConfig | null> => {
@@ -115,5 +123,14 @@ export const createVault = (
     closed = true
   }
 
-  return { read, write, clear, exportBytes, importBytes, importText, close }
+  return {
+    read,
+    write,
+    clear,
+    exportBytes,
+    exportText,
+    importBytes,
+    importText,
+    close,
+  }
 }

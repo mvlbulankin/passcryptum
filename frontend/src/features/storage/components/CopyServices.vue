@@ -1,20 +1,58 @@
 <script setup lang="ts">
-import { stringify } from '#/services'
+import { computed } from 'vue'
+import { useDialog } from 'naive-ui'
 
-import { session } from '@/entities/session'
+import { CopyButton } from '@/shared'
+import { areServicesEmpty, session } from '@/entities/session'
+import { createVaultCopies, type VaultCopyForm } from '../lib/vault-copies'
 
-import AbstractCopyServices from './AbstractCopyServices.vue'
+const props = defineProps<{ form: VaultCopyForm; type?: string }>()
 
-// The encrypted text, formatted the way the app stores it.
-const getEncryptedText = async () => {
-  const services = await session.vault().read()
+const dialog = useDialog()
 
-  return services ? stringify(services) : null
+const copies = computed(() =>
+  session.isActive() ? createVaultCopies(session.vault()) : null,
+)
+
+const copy = computed(() => (copies.value ? copies.value[props.form] : null))
+
+// Handing every secret to the OS clipboard (history, cloud sync) asks
+// first — the rule comes from the form, not from a prop a caller could
+// forget to pass.
+const confirm = () => {
+  const { confirmation } = copy.value ?? {}
+
+  if (!confirmation) {
+    return Promise.resolve(true)
+  }
+
+  return new Promise<boolean>(resolve => {
+    dialog.warning({
+      title: confirmation.title,
+      content: confirmation.content,
+      positiveText: 'Copy',
+      negativeText: 'Cancel',
+      onPositiveClick: () => resolve(true),
+      onNegativeClick: () => resolve(false),
+      onClose: () => resolve(false),
+    })
+  })
 }
+
+const getContent = async () =>
+  copy.value ? (await copy.value.read()) || '' : ''
 </script>
 
 <template>
-  <AbstractCopyServices type="primary" :get-data="getEncryptedText">
-    Copy storage text
-  </AbstractCopyServices>
+  <CopyButton
+    strong
+    tertiary
+    size="large"
+    :type="type"
+    :get-content="getContent"
+    :confirm="copy?.confirmation ? confirm : undefined"
+    :disabled="areServicesEmpty"
+  >
+    {{ copy?.label }}
+  </CopyButton>
 </template>

@@ -14,6 +14,10 @@ export { createSession, SessionClosedError, PinReleaseError } from './session'
 
 export type { Session, SessionDeps, SessionMode, StarterKit } from './session'
 
+// Callers receive a Vault from session.vault(); naming the type is the app's
+// business (the copy forms speak about it).
+export type { Vault } from './vault'
+
 export { wire, WireError, isForbidden } from './wire'
 
 export type { WireErrorKind } from './wire'

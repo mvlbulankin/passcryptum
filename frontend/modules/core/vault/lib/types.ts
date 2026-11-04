@@ -26,6 +26,11 @@ export type Vault = {
   clear(): Promise<void>
   /** The encrypted blob as bytes, for export to a file. */
   exportBytes(): Promise<Uint8Array | null>
+  /**
+   * The encrypted blob as text, exactly as the app stores it — the pair of
+   * importText, so a copied vault can be pasted back in.
+   */
+  exportText(): Promise<string | null>
   /** Reads bytes produced by exportBytes (or an older device's file). */
   importBytes(bytes: ArrayBuffer): Promise<ServicesConfig | null>
   /** Reads pasted text: plaintext JSON or an encrypted blob. */

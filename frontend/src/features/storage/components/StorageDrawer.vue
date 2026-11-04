@@ -10,7 +10,6 @@ import DownloadFile from './DownloadFile.vue'
 import CopyPublicKey from './CopyPublicKey.vue'
 import DeleteServices from './DeleteServices.vue'
 import ImportFromText from './ImportFromText.vue'
-import CopyWithoutEncryption from './CopyWithoutEncryption.vue'
 import UploadServicesToServer from './UploadServicesToServer.vue'
 import DeleteServicesFromServer from './DeleteServicesFromServer.vue'
 import DownloadServicesFromServer from './DownloadServicesFromServer.vue'
@@ -38,8 +37,8 @@ import DownloadServicesFromServer from './DownloadServicesFromServer.vue'
       <NH4>Export services</NH4>
       <NSpace vertical size="large">
         <DownloadFile />
-        <CopyServices />
-        <CopyWithoutEncryption />
+        <CopyServices form="stored" type="primary" />
+        <CopyServices form="plaintext" type="warning" />
       </NSpace>
     </NDrawerContent>
   </NDrawer>
