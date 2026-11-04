@@ -17,6 +17,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"time"
 
 	"passcryptum/internal/guard"
@@ -67,15 +68,32 @@ type Recipe struct {
 
 	// NeedsProfile makes the endpoint answer 403 for a key that was never
 	// onboarded. It is part of the contract, so it belongs to the recipe
-	// rather than to each handler's memory.
+	// rather than to each handler's memory — and the pipeline, not the mux,
+	// enforces it (Options.ProfileExists).
 	NeedsProfile bool
+}
+
+// signed reports whether the recipe authenticates by signature. The nonce
+// requirement is DERIVED, never declared: a signature must cover a nonce
+// (ADR-0003) or two requests in the same second collide in the replay
+// cache, and a recipe that forgets a NeedsNonce flag would break exactly
+// that invariant. Unsigned credential requests keep their factor-auth quirk
+// and carry no nonce.
+func (r Recipe) signed() bool {
+	return r.BodySigned || slices.Contains(r.Headers, HdrSignature)
 }
 
 // Options carries what the pipeline needs besides the request itself. The
 // clock is injected so the timestamp window can be tested at its exact
-// boundaries instead of relative to the wall clock.
+// boundaries instead of relative to the wall clock. ProfileExists backs the
+// recipe's NeedsProfile clause: the pipeline owns that clause, so the
+// question has one owner instead of living half in the recipe and half in
+// the mux.
 type Options struct {
 	Now func() time.Time
+	// ProfileExists answers whether a key was onboarded. Required when a
+	// recipe sets NeedsProfile; the pipeline answers 403 itself.
+	ProfileExists func(publicB64 string) (bool, error)
 }
 
 // Auth is the verified request identity plus any payload the recipe carried.
@@ -201,15 +219,12 @@ func ParseRequestWith(
 		}
 	}
 
-	// Signed requests carry a nonce: it makes every request's signature
-	// unique, so the replay cache never rejects a legitimate second request
-	// within the same timestamp second. It is read here rather than via
-	// Recipe.Headers: the header is required by the protocol on signed
-	// requests, not declaratively by the endpoint. Unsigned credential
-	// requests keep their factor-auth quirk and carry no nonce.
-	if signature != nil || rec.BodySigned {
-		// Read it here rather than via Recipe.Headers: the header is required
-		// by the version, not declaratively by the endpoint.
+	// A signed request carries a nonce: it makes every signature unique, so
+	// the replay cache never rejects a legitimate second request within the
+	// same timestamp second. The requirement is derived from the recipe
+	// (signed()) — a declared flag could be forgotten, and forgetting it
+	// silently reintroduces the same-second collision.
+	if rec.signed() {
 		if raw := r.Header.Get(HdrNonce); raw != "" {
 			decoded, derr := base64.StdEncoding.DecodeString(raw)
 			if derr != nil {
@@ -231,7 +246,7 @@ func ParseRequestWith(
 	}
 
 	if rec.BodySigned {
-		return parseSignedBody(r, g, p, now)
+		return parseSignedBody(r, g, p, rec, opts, now)
 	}
 
 	if err := checkTimestamp(timestamp, now); err != nil {
@@ -257,6 +272,37 @@ func ParseRequestWith(
 		return nil, &Error{Status: http.StatusForbidden, Reason: "replayed request"}
 	}
 
+	return authed(p, rec, opts, timestamp, nonce)
+}
+
+// authed applies the recipe clauses that need the verified identity: the
+// Profile-existence requirement. Before this lived here, `NeedsProfile` was
+// declared in the recipe but enforced in the mux — one clause, two owners.
+func authed(
+	p *pending,
+	rec Recipe,
+	opts Options,
+	timestamp, nonce []byte,
+) (*Auth, *Error) {
+	if !rec.NeedsProfile {
+		return &p.auth, nil
+	}
+
+	if opts.ProfileExists == nil {
+		// A programming error, not a protocol one: fail closed instead of
+		// silently serving an endpoint without its profile check.
+		return nil, &Error{Status: http.StatusInternalServerError}
+	}
+
+	exists, err := opts.ProfileExists(p.auth.PublicB64)
+	if err != nil {
+		return nil, &Error{Status: http.StatusInternalServerError}
+	}
+
+	if !exists {
+		return nil, &Error{Status: http.StatusForbidden, Reason: "unknown profile"}
+	}
+
 	return &p.auth, nil
 }
 
@@ -264,6 +310,8 @@ func parseSignedBody(
 	r *http.Request,
 	g *guard.Guard,
 	p *pending,
+	rec Recipe,
+	opts Options,
 	now func() time.Time,
 ) (*Auth, *Error) {
 	body, err := readBody(r)
@@ -298,7 +346,7 @@ func parseSignedBody(
 
 	p.auth.Payload = payload
 
-	return &p.auth, nil
+	return authed(p, rec, opts, tstamp, p.nonce)
 }
 
 func checkTimestamp(raw []byte, now func() time.Time) *Error {

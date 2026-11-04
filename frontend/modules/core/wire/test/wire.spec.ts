@@ -315,3 +315,120 @@ describe('Wire Protocol client — setServices', () => {
     ).rejects.toMatchObject({ kind: 'forbidden' })
   })
 })
+
+// The endpoint table is the single place an endpoint's recipe lives. This
+// pins that the builder still produces what the protocol expects for every
+// row — a new endpoint, or an edited factor list, cannot drift silently.
+describe('endpoint recipes', () => {
+  const client = createWireClient(
+    fakeTransport(() => ({ status: 200, body: '"AAAA"' })),
+  )
+  const protector = new Uint8Array(32).fill(1)
+  const hashedPin = new Uint8Array(32).fill(2)
+  const payload = new Uint8Array(4).fill(3)
+
+  const cases: Array<[string, () => Promise<unknown>, string, string]> = [
+    ['getServices', () => client.getServices(seed), 'GET', '/api/profiles/'],
+    [
+      'setServices',
+      () => client.setServices(seed, payload),
+      'POST',
+      '/api/profiles/',
+    ],
+    [
+      'clearServices',
+      () => client.clearServices(seed),
+      'DELETE',
+      '/api/profiles/',
+    ],
+    [
+      'getEntropy',
+      () => client.getEntropy(publicKey, hashedPin, protector),
+      'GET',
+      '/api/credentials/',
+    ],
+    [
+      'createCredential',
+      () => client.createCredential(seed, hashedPin, payload),
+      'POST',
+      '/api/credentials/',
+    ],
+    [
+      'deleteCredential',
+      () => client.deleteCredential(publicKey, protector),
+      'DELETE',
+      '/api/credentials/',
+    ],
+  ]
+
+  it.each(cases)(
+    '%s sends its declared method and URL',
+    async (_name, run, method, url) => {
+      await run().catch(() => undefined)
+
+      expect(capturedRequest?.method).toBe(method)
+      expect(capturedRequest?.url).toContain(url)
+    },
+  )
+
+  it('carries a nonce on every signed endpoint, and none on the unsigned two', async () => {
+    // The nonce is the replay key on every signed request; how the signature
+    // travels differs — a header for the header recipes, inside the body
+    // for the body recipes (ADR-0003).
+    const signed: Array<() => Promise<unknown>> = [
+      () => client.getServices(seed),
+      () => client.setServices(seed, payload),
+      () => client.clearServices(seed),
+      () => client.createCredential(seed, hashedPin, payload),
+    ]
+    const unsigned: Array<() => Promise<unknown>> = [
+      () => client.getEntropy(publicKey, hashedPin, protector),
+      () => client.deleteCredential(publicKey, protector),
+    ]
+
+    for (const run of signed) {
+      await run().catch(() => undefined)
+
+      expect(capturedRequest?.headers.Nonce).toBeDefined()
+    }
+
+    for (const run of unsigned) {
+      await run().catch(() => undefined)
+
+      expect(capturedRequest?.headers.Signature).toBeUndefined()
+      expect(capturedRequest?.headers.Nonce).toBeUndefined()
+    }
+  })
+
+  it('sends the signature in the header for header recipes, in the body for body recipes', async () => {
+    await client.getServices(seed).catch(() => undefined)
+    expect(capturedRequest?.headers.Signature).toBeDefined()
+    expect(capturedRequest?.body).toBeUndefined()
+
+    await client.setServices(seed, payload).catch(() => undefined)
+    // b64(sig(64) ‖ ts(4) ‖ payload): no Signature header, a body instead.
+    expect(capturedRequest?.headers.Signature).toBeUndefined()
+    expect(capturedRequest?.body).toBeDefined()
+    expect(Buffer.from(capturedRequest!.body!, 'base64').length).toBe(
+      64 + 4 + payload.length,
+    )
+  })
+
+  it('carries exactly the factors each endpoint declares', async () => {
+    await client
+      .getEntropy(publicKey, hashedPin, protector)
+      .catch(() => undefined)
+    expect(capturedRequest?.headers['Hashed-Pin']).toBeDefined()
+    expect(capturedRequest?.headers.Protector).toBeDefined()
+
+    await client
+      .createCredential(seed, hashedPin, payload)
+      .catch(() => undefined)
+    expect(capturedRequest?.headers['Hashed-Pin']).toBeDefined()
+    expect(capturedRequest?.headers.Protector).toBeUndefined()
+
+    await client.deleteCredential(publicKey, protector).catch(() => undefined)
+    expect(capturedRequest?.headers['Hashed-Pin']).toBeUndefined()
+    expect(capturedRequest?.headers.Protector).toBeDefined()
+  })
+})

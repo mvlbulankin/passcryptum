@@ -404,3 +404,95 @@ func TestNonceMakesSameSecondRequestsDistinct(t *testing.T) {
 		}
 	}
 }
+
+// The nonce requirement is derived from the recipe, not declared on it: a
+// signed recipe that forgot a flag would silently reintroduce the same-
+// second collision the nonce exists to prevent.
+func TestNonceIsDerivedFromTheRecipeBeingSigned(t *testing.T) {
+	g := realGuard()
+
+	assertNeedsNonce := func(name string, rec Recipe, headers map[string]string) {
+		t.Helper()
+
+		delete(headers, HdrNonce)
+
+		if _, err := ParseRequest(request("GET", headers, nil), g, rec); err == nil {
+			t.Fatalf("%s: a signed recipe must reject a request without a nonce", name)
+		}
+	}
+
+	// Header-signed, body-signed: both derived as signed.
+	assertNeedsNonce("header recipe", profilesGet, signedHeaders("GET", tsNow, 40))
+	assertNeedsNonce("body recipe", profilesPost, map[string]string{
+		HdrProtocolVersion: ProtocolVersion,
+		HdrPublicKey:       pubB64,
+	})
+
+	// The unsigned credential recipe keeps its factor-auth quirk: no nonce,
+	// no signature, and it must still pass.
+	unsigned := map[string]string{
+		HdrProtocolVersion: ProtocolVersion,
+		HdrPublicKey:       pubB64,
+		HdrHashedPin:       b64([]byte("pin")),
+		HdrProtector:       b64([]byte("prot")),
+		HdrTimestamp:       b64(tsNow),
+	}
+
+	if _, err := ParseRequest(request("GET", unsigned, nil), g, credentialsGet); err != nil {
+		t.Fatalf("an unsigned recipe must not require a nonce: %v", err)
+	}
+}
+
+// NeedsProfile is a recipe clause with one owner: the pipeline answers 403
+// itself, before the domain function runs.
+func TestNeedsProfileIsEnforcedByThePipeline(t *testing.T) {
+	g := realGuard()
+
+	rec := Recipe{
+		Headers:      []string{HdrPublicKey, HdrTimestamp, HdrSignature},
+		NeedsProfile: true,
+	}
+	fixedNow := func() time.Time {
+		return time.Unix(int64(binary.LittleEndian.Uint32(tsNow)), 0)
+	}
+
+	// A fresh nonce per subtest: accepted signatures stay in the replay
+	// cache, so reusing one would test the cache, not the profile clause.
+	headersFor := func(seed byte) map[string]string {
+		return signedHeaders("GET", tsNow, seed)
+	}
+
+	t.Run("unknown profile is forbidden before the handler runs", func(t *testing.T) {
+		opts := Options{
+			Now:           fixedNow,
+			ProfileExists: func(string) (bool, error) { return false, nil },
+		}
+
+		_, err := ParseRequestWith(request("GET", headersFor(41), nil), g, rec, opts)
+		if err == nil || err.Status != http.StatusForbidden {
+			t.Fatalf("want 403, got %#v", err)
+		}
+	})
+
+	t.Run("known profile passes", func(t *testing.T) {
+		opts := Options{
+			Now:           fixedNow,
+			ProfileExists: func(string) (bool, error) { return true, nil },
+		}
+
+		if _, err := ParseRequestWith(request("GET", headersFor(42), nil), g, rec, opts); err != nil {
+			t.Fatalf("a known profile must pass: %v", err)
+		}
+	})
+
+	t.Run("a missing checker fails closed", func(t *testing.T) {
+		// Declaring NeedsProfile without supplying the checker is a wiring
+		// bug: serving the endpoint unchecked would be worse than a 500.
+		opts := Options{Now: fixedNow}
+
+		_, err := ParseRequestWith(request("GET", headersFor(43), nil), g, rec, opts)
+		if err == nil || err.Status != http.StatusInternalServerError {
+			t.Fatalf("want 500, got %#v", err)
+		}
+	})
+}

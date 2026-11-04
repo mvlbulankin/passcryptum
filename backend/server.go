@@ -166,27 +166,14 @@ func (s *server) handle(
 	rec wire.Recipe,
 	fn endpoint,
 ) {
-	auth, e := wire.ParseRequestWith(r, s.g, rec, wire.Options{Now: s.now})
+	auth, e := wire.ParseRequestWith(r, s.g, rec, wire.Options{
+		Now:           s.now,
+		ProfileExists: s.st.ProfileExists,
+	})
 	if e != nil {
 		s.writeWireError(w, r, e)
 
 		return
-	}
-
-	if rec.NeedsProfile {
-		exists, err := s.st.ProfileExists(auth.PublicB64)
-		if err != nil {
-			log.Printf("db error: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-
-			return
-		}
-
-		if !exists {
-			s.writeDenied(w, r, auth.PublicB64, "unknown profile")
-
-			return
-		}
 	}
 
 	result, e := fn(auth)

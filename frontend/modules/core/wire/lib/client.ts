@@ -1,38 +1,94 @@
 import {
   base64ToUint8Array,
-  getKeyPairFromSeed,
   uint8ArrayToBase64,
+  getKeyPairFromSeed,
 } from '../../shared'
-import { WireError } from './wire-error'
 import {
   concatUint8Arrays,
   createSignature,
   generateNonce,
   generateTimestamp,
 } from './protocol'
-import { profilesUrl, credentialsUrl } from './urls'
-import type { Transport, WireClient, WireRequest } from './types'
+import { credentialsUrl, profilesUrl } from './urls'
+import type { Transport, WireRequest, WireResponse } from './types'
+import { WireError } from './wire-error'
 
-// The wire protocol (ADR-0002, ADR-0003): every request declares its
-// version — `Protocol-Version: 2`, the only one the server speaks — and
-// every signature binds the HTTP method, so a captured GET can no longer be
-// replayed as a DELETE, and the server's one-sided window applies.
+// The Wire Protocol client's implementation.
+//
+// An endpoint is a row of data: method, URL, which factors the request
+// carries, which way it is signed, and what a successful status means. One
+// builder turns a row into a request. Before this, each of the six
+// endpoints was a closure that rebuilt the same version headers, base64
+// block and status ladder by hand — so every protocol tweak (the version
+// header, the nonce) had to be applied in several places in one file.
+//
+// Nothing here changes the bytes: framing, signing and the status
+// vocabulary are the same ones ADR-0003 pins and wire.spec.ts checks.
+
 const protocolVersion = '2'
 
-const versionHeaders = { 'Protocol-Version': protocolVersion }
+/** How a request proves it is the Profile it claims. */
+type Signing =
+  | 'none' // factor auth: public key + protector (+ PIN), no signature
+  | 'header' // signature over method ‖ ts ‖ nonce
+  | 'body' // b64(sig ‖ ts ‖ payload), signature over method ‖ ts ‖ nonce ‖ payload
+
+type Recipe = {
+  method: 'GET' | 'POST' | 'DELETE'
+  url: string
+  signing: Signing
+  /** Extra factors beyond the public key, sent as base64 headers. */
+  factors?: readonly ('hashedPin' | 'protector')[]
+}
+
+const ENDPOINTS = {
+  getServices: {
+    method: 'GET',
+    url: profilesUrl(),
+    signing: 'header',
+  },
+  setServices: {
+    method: 'POST',
+    url: profilesUrl(),
+    signing: 'body',
+  },
+  clearServices: {
+    method: 'DELETE',
+    url: profilesUrl(),
+    signing: 'header',
+  },
+  getEntropy: {
+    method: 'GET',
+    url: credentialsUrl(),
+    signing: 'none',
+    factors: ['hashedPin', 'protector'],
+  },
+  createCredential: {
+    method: 'POST',
+    url: credentialsUrl(),
+    signing: 'body',
+    factors: ['hashedPin'],
+  },
+  deleteCredential: {
+    method: 'DELETE',
+    url: credentialsUrl(),
+    signing: 'none',
+    factors: ['protector'],
+  },
+} as const satisfies Record<string, Recipe>
+
+export type EndpointName = keyof typeof ENDPOINTS
 
 const methodBytes = (method: string) => new TextEncoder().encode(method)
 
-// Signed messages: method ‖ timestamp ‖ nonce (header recipes) and
-// method ‖ timestamp ‖ nonce ‖ payload (body recipes). The nonce is what
-// keeps two requests in the same second from sharing a signature.
+/** The signed message for header recipes: method ‖ timestamp ‖ nonce. */
 const headerMessage = (
   method: string,
   timestamp: Uint8Array,
   nonce: Uint8Array,
 ) => concatUint8Arrays(concatUint8Arrays(methodBytes(method), timestamp), nonce)
 
-// b64(sig ‖ ts ‖ payload) with the v2 signature over method ‖ ts ‖ payload.
+/** b64(sig ‖ ts ‖ payload), with the signature over method ‖ ts ‖ nonce ‖ payload. */
 const signedBody = (
   method: string,
   secretKey: Uint8Array,
@@ -40,25 +96,109 @@ const signedBody = (
   nonce: Uint8Array,
 ) => {
   const timestamp = generateTimestamp()
-  const combined = concatUint8Arrays(timestamp, payload)
 
   const signature = createSignature(
     concatUint8Arrays(
-      concatUint8Arrays(
-        methodBytes(method),
-        concatUint8Arrays(timestamp, nonce),
-      ),
-      payload,
+      concatUint8Arrays(methodBytes(method), timestamp),
+      concatUint8Arrays(nonce, payload),
     ),
     secretKey,
   )
 
-  return uint8ArrayToBase64(concatUint8Arrays(signature, combined))
+  return uint8ArrayToBase64(
+    concatUint8Arrays(signature, concatUint8Arrays(timestamp, payload)),
+  )
+}
+
+type Params = {
+  /** Required for every endpoint: the Profile identifier. */
+  publicKey: Uint8Array
+  secretKey?: Uint8Array
+  hashedPin?: Uint8Array
+  protector?: Uint8Array
+  payload?: Uint8Array
+}
+
+const baseHeaders = (): Record<string, string> => ({
+  'Protocol-Version': protocolVersion,
+  'Content-Type': 'application/json',
+})
+
+const factorHeaders = (recipe: Recipe, params: Params) => {
+  const headers: Record<string, string> = {}
+
+  for (const factor of recipe.factors ?? []) {
+    const value = factor === 'hashedPin' ? params.hashedPin : params.protector
+
+    if (!value) {
+      throw new Error(`wire: ${factor} is required by this endpoint`)
+    }
+
+    headers[factor === 'hashedPin' ? 'Hashed-Pin' : 'Protector'] =
+      uint8ArrayToBase64(value)
+  }
+
+  return headers
+}
+
+/** Turns a recipe row plus the caller's material into a WireRequest. */
+export const buildRequest = (recipe: Recipe, params: Params): WireRequest => {
+  const headers: Record<string, string> = {
+    ...baseHeaders(),
+    'Public-Key': uint8ArrayToBase64(params.publicKey),
+    ...factorHeaders(recipe, params),
+  }
+
+  if (recipe.signing === 'body') {
+    const nonce = generateNonce()
+
+    if (!params.secretKey) {
+      throw new Error('wire: a body-signed endpoint needs the secret key')
+    }
+
+    headers.Nonce = uint8ArrayToBase64(nonce)
+
+    return {
+      method: recipe.method,
+      url: recipe.url,
+      headers,
+      body: signedBody(
+        recipe.method,
+        params.secretKey,
+        params.payload ?? new Uint8Array(0),
+        nonce,
+      ),
+    }
+  }
+
+  // Both the signed and the factor-auth endpoints carry a timestamp; the
+  // signed ones bind it into the signature.
+  const timestamp = generateTimestamp()
+
+  headers.Timestamp = uint8ArrayToBase64(timestamp)
+
+  if (recipe.signing === 'header') {
+    const nonce = generateNonce()
+
+    if (!params.secretKey) {
+      throw new Error('wire: a signed endpoint needs the secret key')
+    }
+
+    headers.Nonce = uint8ArrayToBase64(nonce)
+    headers.Signature = uint8ArrayToBase64(
+      createSignature(
+        headerMessage(recipe.method, timestamp, nonce),
+        params.secretKey,
+      ),
+    )
+  }
+
+  return { method: recipe.method, url: recipe.url, headers }
 }
 
 // Runs one request through the transport, turning transport failures into
-// WireError('network'). HTTP statuses stay raw: each endpoint recipe maps
-// them itself, because the contract gives each status a meaning.
+// WireError('network'). HTTP statuses stay raw: the endpoint recipes map
+// them, because the contract gives each status a meaning.
 const send = async (transport: Transport, request: WireRequest) => {
   try {
     return await transport(request)
@@ -80,59 +220,32 @@ const forbiddenOrUnexpected = (status: number): WireError =>
 // Success bodies are bare JSON-encoded strings ("base64blob").
 const parseJsonStringBody = (body: string): Uint8Array => {
   try {
-    const raw = JSON.parse(body) as string
-
-    return base64ToUint8Array(raw)
+    return base64ToUint8Array(JSON.parse(body) as string)
   } catch {
     throw new WireError('malformedResponse')
   }
 }
 
-/**
- * The signed header set for the header-authenticated endpoints (GET/DELETE on
- * profiles): public key, timestamp, nonce and a signature over
- * method ‖ timestamp ‖ nonce.
- */
-const signedHeaders = (
-  method: 'GET' | 'DELETE',
-  keyPairSeed: Uint8Array,
-): Record<string, string> => {
-  const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
-  const timestamp = generateTimestamp()
-  const nonce = generateNonce()
+export const createWireClient = (transport: Transport) => {
+  const call = async (
+    name: EndpointName,
+    params: Params,
+  ): Promise<WireResponse> =>
+    send(transport, buildRequest(ENDPOINTS[name], params))
 
-  const signature = createSignature(
-    headerMessage(method, timestamp, nonce),
-    secretKey,
-  )
-
-  return {
-    ...versionHeaders,
-    'Content-Type': 'application/json',
-    'Public-Key': uint8ArrayToBase64(publicKey),
-    'Timestamp': uint8ArrayToBase64(timestamp),
-    'Nonce': uint8ArrayToBase64(nonce),
-    'Signature': uint8ArrayToBase64(signature),
-  }
-}
-
-export const createWireClient = (transport: Transport): WireClient => {
   const getServices = async (keyPairSeed: Uint8Array) => {
-    const { status, body } = await send(transport, {
-      method: 'GET',
-      url: profilesUrl(),
-      headers: signedHeaders('GET', keyPairSeed),
-    })
+    const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
+    const response = await call('getServices', { publicKey, secretKey })
 
-    if (status === 200) {
-      return parseJsonStringBody(body)
+    if (response.status === 200) {
+      return parseJsonStringBody(response.body)
     }
 
-    if (status === 204) {
+    if (response.status === 204) {
       return null
     }
 
-    throw forbiddenOrUnexpected(status)
+    throw forbiddenOrUnexpected(response.status)
   }
 
   const setServices = async (
@@ -140,18 +253,11 @@ export const createWireClient = (transport: Transport): WireClient => {
     encrypted: Uint8Array,
   ) => {
     const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
-    const nonce = generateNonce()
 
-    const { status } = await send(transport, {
-      method: 'POST',
-      url: profilesUrl(),
-      body: signedBody('POST', secretKey, encrypted, nonce),
-      headers: {
-        ...versionHeaders,
-        'Content-Type': 'application/json',
-        'Public-Key': uint8ArrayToBase64(publicKey),
-        'Nonce': uint8ArrayToBase64(nonce),
-      },
+    const { status } = await call('setServices', {
+      publicKey,
+      secretKey,
+      payload: encrypted,
     })
 
     if (status !== 200) {
@@ -162,11 +268,8 @@ export const createWireClient = (transport: Transport): WireClient => {
   const clearServices = async (
     keyPairSeed: Uint8Array,
   ): Promise<'cleared' | 'already-empty'> => {
-    const { status } = await send(transport, {
-      method: 'DELETE',
-      url: profilesUrl(),
-      headers: signedHeaders('DELETE', keyPairSeed),
-    })
+    const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
+    const { status } = await call('clearServices', { publicKey, secretKey })
 
     if (status === 200) {
       return 'cleared'
@@ -184,17 +287,10 @@ export const createWireClient = (transport: Transport): WireClient => {
     hashedPin: Uint8Array,
     protector: Uint8Array,
   ) => {
-    const { status, body } = await send(transport, {
-      method: 'GET',
-      url: credentialsUrl(),
-      headers: {
-        ...versionHeaders,
-        'Content-Type': 'application/json',
-        'Public-Key': uint8ArrayToBase64(publicKey),
-        'Hashed-Pin': uint8ArrayToBase64(hashedPin),
-        'Protector': uint8ArrayToBase64(protector),
-        'Timestamp': uint8ArrayToBase64(generateTimestamp()),
-      },
+    const { status, body } = await call('getEntropy', {
+      publicKey,
+      hashedPin,
+      protector,
     })
 
     if (status === 200) {
@@ -210,19 +306,12 @@ export const createWireClient = (transport: Transport): WireClient => {
     entropy: Uint8Array,
   ) => {
     const { secretKey, publicKey } = getKeyPairFromSeed(keyPairSeed)
-    const nonce = generateNonce()
 
-    const { status, body } = await send(transport, {
-      method: 'POST',
-      url: credentialsUrl(),
-      body: signedBody('POST', secretKey, entropy, nonce),
-      headers: {
-        ...versionHeaders,
-        'Content-Type': 'application/json',
-        'Public-Key': uint8ArrayToBase64(publicKey),
-        'Hashed-Pin': uint8ArrayToBase64(hashedPin),
-        'Nonce': uint8ArrayToBase64(nonce),
-      },
+    const { status, body } = await call('createCredential', {
+      publicKey,
+      secretKey,
+      hashedPin,
+      payload: entropy,
     })
 
     if (status === 200) {
@@ -236,16 +325,9 @@ export const createWireClient = (transport: Transport): WireClient => {
     publicKey: Uint8Array,
     protector: Uint8Array,
   ) => {
-    const { status } = await send(transport, {
-      method: 'DELETE',
-      url: credentialsUrl(),
-      headers: {
-        ...versionHeaders,
-        'Content-Type': 'application/json',
-        'Public-Key': uint8ArrayToBase64(publicKey),
-        'Protector': uint8ArrayToBase64(protector),
-        'Timestamp': uint8ArrayToBase64(generateTimestamp()),
-      },
+    const { status } = await call('deleteCredential', {
+      publicKey,
+      protector,
     })
 
     if (status !== 200) {
