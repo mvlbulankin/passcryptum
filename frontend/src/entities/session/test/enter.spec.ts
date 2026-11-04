@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { PinReleaseError } from '#/core'
 
 // The session core is heavy (PBKDF2, storage); this pins the FLAG discipline
 // of the app-level entry point: whichever way the attempt ends, the
@@ -54,9 +55,26 @@ describe('session entry flag discipline', () => {
   })
 
   it('releases the flag after a failed PIN attempt', async () => {
-    enterWithPin.mockRejectedValue(new Error('bad pin'))
+    enterWithPin.mockRejectedValue(new PinReleaseError('wrongPin'))
 
     await expect(enterByPin('00000000')).rejects.toThrow('Wrong PIN')
+
+    expect(isCalculationInProgress.value).toBe(false)
+  })
+
+  it('says what actually failed instead of blaming the PIN', async () => {
+    // A network outage is not a wrong PIN; the reason survives to the form.
+    enterWithPin.mockRejectedValue(new PinReleaseError('network'))
+
+    await expect(enterByPin('00000000')).rejects.toThrow('Network error')
+
+    expect(isCalculationInProgress.value).toBe(false)
+  })
+
+  it('rethrows what it cannot explain', async () => {
+    enterWithPin.mockRejectedValue(new Error('bad pin'))
+
+    await expect(enterByPin('00000000')).rejects.toThrow('bad pin')
 
     expect(isCalculationInProgress.value).toBe(false)
   })

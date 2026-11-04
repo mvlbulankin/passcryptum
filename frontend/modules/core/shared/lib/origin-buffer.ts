@@ -1,4 +1,6 @@
-import { capitals, formatPassword, stringifyBuffer } from '../../shared'
+import { stringifyBuffer } from './buffer'
+import { capitals } from './charset'
+import { formatPassword } from './format-password'
 
 // The Origin Buffer layout. One place, so the app and anything mirroring it
 // (tests, tooling) cannot drift apart silently.

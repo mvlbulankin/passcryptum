@@ -11,15 +11,15 @@ application actually uses; everything else is an implementation detail, and
 
 ## What is here
 
-| Module                | Owns                                                                                               |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
-| `session/`            | who is logged in: the derived keys, the vault instance, the online/offline mode, PIN availability  |
-| `vault/`              | Services as stored on the device: one encrypted blob, its format, export to a file and import back |
-| `wire/`               | the Wire Protocol client — the only way the app talks to the server                                |
-| `pin/`                | storing and releasing the Origin Buffer under a PIN                                                |
-| `generator/`          | service password derivation from Entropy                                                           |
-| `actions/`, `shared/` | PIN-derived AES material and crypto/encoding primitives                                            |
-| `constants.ts`        | protocol and storage constants (iterations, key names, minimum PIN length)                         |
+| Module         | Owns                                                                                               |
+| -------------- | -------------------------------------------------------------------------------------------------- |
+| `session/`     | who is logged in: the derived keys, the vault instance, the visited flag                           |
+| `vault/`       | Services as stored on the device: one encrypted blob, its format, export to a file and import back |
+| `wire/`        | the Wire Protocol client — the only way the app talks to the server                                |
+| `pin/`         | PIN Custody: holding the Origin Buffer under a PIN, online or offline (GLOSSARY)                   |
+| `generator/`   | service password derivation from Entropy                                                           |
+| `shared/`      | crypto/encoding primitives and the Origin Buffer layout                                            |
+| `constants.ts` | protocol and storage constants (iterations, key names, minimum PIN length)                         |
 
 ## Logging in and out
 
@@ -40,6 +40,26 @@ Session.exit(): void
 After `exit()`, every secret accessor throws `SessionClosedError`; the vault
 closes with it, and the Origin Buffer is zeroized before the reference is
 dropped.
+
+`enterWithPin` delegates to the PIN Custody and surfaces its failure
+vocabulary as `PinReleaseError` (`reason`: wrongPin, noStoredBuffer,
+network, …) — a network outage is no longer reported as a wrong PIN.
+
+## Holding the Origin Buffer under a PIN
+
+```ts
+pinCustody.store(kind, pin, buffer) // hand it over: 'online' | 'offline'
+pinCustody.release(pin) // take it back; source follows the mode
+pinCustody.revoke(kind) // drop one custody
+pinCustody.isSet(kind) // derived from storage, never stale
+```
+
+Online custody is a Credential on the server (the device keeps the public
+key and the Protector); offline custody is an encrypted blob on the device.
+The KDFs, the localStorage record and the wire calls stay behind the
+interface; failures come back as a closed outcome vocabulary the UI maps to
+texts. The session exposes `mode()`/`setMode()` as a delegation to the
+custody, which owns the stored mode.
 
 ## Reading and writing Services
 
@@ -73,11 +93,13 @@ version headers are internal. Failures are `WireError` with a `kind`;
 
 ```ts
 Session.subscribe(listener): () => void
+pinCustody.subscribe(listener): () => void
 ```
 
-The session is plain state; `src/entities/session` wraps it in refs and
-re-reads on change. PIN flags are derived from storage on each read, never
-snapshotted — a stale flag cannot appear.
+The session and the custody are plain state; `src/entities/session` wraps
+them in refs and re-reads on change. PIN flags are derived from the
+custody's storage on each read, never snapshotted — a stale flag cannot
+appear.
 
 ## Tests
 

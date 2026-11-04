@@ -2,10 +2,24 @@ import { webcrypto } from 'crypto'
 
 import { describe, it, expect, beforeEach } from 'vitest'
 
-import { createSession, SessionClosedError } from '../index'
+import { createSession, SessionClosedError, PinReleaseError } from '../index'
 import type { SessionStorage } from '../index'
 
+import { createPinCustody } from '../../pin'
+import type { WireClient } from '../../wire'
+
 Object.defineProperty(global, 'crypto', { value: webcrypto })
+
+// The session never touches the network: its custody runs over an injected
+// storage and a fake wire client, so enterWithPin is testable here.
+const fakeWireClient = (): WireClient => ({
+  getServices: async () => null,
+  setServices: async () => undefined,
+  clearServices: async () => 'cleared',
+  getEntropy: async () => new Uint8Array(0),
+  createCredential: async () => new Uint8Array(32),
+  deleteCredential: async () => undefined,
+})
 
 // The session is exercised through its interface with an injected storage.
 // No Vue, no features, no globals: that is what the seam is for.
@@ -38,7 +52,10 @@ describe('Session', () => {
       calls += 1
     }
 
-    session = createSession({ storage })
+    session = createSession({
+      storage,
+      custody: createPinCustody({ storage, wire: fakeWireClient() }),
+    })
     session.subscribe(onChange)
   })
 
@@ -124,26 +141,40 @@ describe('Session', () => {
     session.setMode('online')
     expect(session.mode()).toBe('online')
 
-    // Persisted: a new session object sees the same mode.
-    expect(createSession({ storage }).mode()).toBe('online')
+    // Persisted: a new session object over the same storage sees it.
+    expect(
+      createSession({
+        storage,
+        custody: createPinCustody({ storage, wire: fakeWireClient() }),
+      }).mode(),
+    ).toBe('online')
   })
 
-  it('reports PIN availability from storage, not a snapshot', () => {
-    expect(session.isOnlinePinSet()).toBe(false)
+  it('re-enters with the PIN that holds the Origin Buffer', async () => {
+    const kit = await session.enter(PASSWORD)
 
-    storage.setItem('public_key', 'pk')
-    storage.setItem('protector', 'pr')
-    storage.setItem('random_string', 'rs')
+    const custody = createPinCustody({
+      storage,
+      wire: fakeWireClient(),
+    })
 
-    // No setter was called: the flag is derived, so it is already true.
-    expect(session.isOnlinePinSet()).toBe(true)
+    await custody.store('offline', '12345678', session.originBuffer())
+    session.exit()
 
-    storage.removeItem('protector')
-    expect(session.isOnlinePinSet()).toBe(false)
+    const again = await session.enterWithPin('12345678')
+
+    expect(session.isActive()).toBe(true)
+    expect(again.id).toBe(kit.id)
+    expect(session.publicKey()).toHaveLength(32)
   })
 
-  it('refuses to enter with a PIN when no online PIN is stored', async () => {
-    await expect(session.enterWithPin('12345678')).rejects.toThrow()
+  it('refuses to enter with a PIN when nothing is held', async () => {
+    const attempt = session.enterWithPin('12345678')
+
+    await expect(attempt).rejects.toBeInstanceOf(PinReleaseError)
+    await expect(attempt).rejects.toMatchObject({
+      reason: 'noStoredBuffer',
+    })
     expect(session.isActive()).toBe(false)
   })
 })

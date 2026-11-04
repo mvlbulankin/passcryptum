@@ -3,8 +3,7 @@ import { webcrypto } from 'crypto'
 import { describe, it, expect } from 'vitest'
 
 import { parseOriginBuffer } from '../lib/origin-buffer'
-
-import { pbkdf2, getBufferOfText } from '../../shared'
+import { pbkdf2, getBufferOfText } from '../index'
 
 Object.defineProperty(global, 'crypto', { value: webcrypto })
 

@@ -8,12 +8,12 @@ import {
   useLoadingBar,
 } from 'naive-ui'
 import { ref } from 'vue'
-import { MIN_PIN_LENGTH, setOfflinePin } from '#/core'
+import { MIN_PIN_LENGTH, pinCustody } from '#/core'
 import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
 
 import { FormSubmit } from '@/shared'
 import { isCalculationInProgress } from '@/entities/session'
-import { session, touchSession, showSetOfflinePinModal } from '../model'
+import { session, showSetOfflinePinModal } from '../model'
 
 const pin = ref('')
 
@@ -24,6 +24,12 @@ const clearForm = () => {
   pin.value = ''
 }
 
+const fail = () => {
+  loadingBar.error()
+  message.error('Failed to set offline PIN')
+  isCalculationInProgress.value = false
+}
+
 const onSubmit = () => {
   if (pin.value.length < MIN_PIN_LENGTH) {
     message.error(`PIN must be at least ${MIN_PIN_LENGTH} characters`)
@@ -32,27 +38,23 @@ const onSubmit = () => {
   }
 
   loadingBar.start()
+  isCalculationInProgress.value = true
 
-  setOfflinePin(session, localStorage, pin.value)
-    .then(() => {
-      touchSession()
-      message.success('Offline PIN has been set')
-      loadingBar.finish()
-
-      isCalculationInProgress.value = false
-      showSetOfflinePinModal.value = false
+  pinCustody
+    .store('offline', pin.value, session.originBuffer())
+    .then(result => {
+      if (result.ok) {
+        message.success('Offline PIN has been set')
+        loadingBar.finish()
+        isCalculationInProgress.value = false
+        showSetOfflinePinModal.value = false
+      } else {
+        fail()
+      }
     })
-    .catch(() => {
-      // The flag must be released on EVERY exit path; a rejected store
-      // otherwise leaves the form locked until a page reload.
-      loadingBar.error()
-      message.error('Failed to set offline PIN')
-      isCalculationInProgress.value = false
-    })
+    .catch(fail)
 
   clearForm()
-
-  isCalculationInProgress.value = true
 }
 </script>
 

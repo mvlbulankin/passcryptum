@@ -10,26 +10,31 @@ import {
   updateServicePreferences,
 } from '#/services'
 import { ref, computed } from 'vue'
+import { pinCustody } from '#/core'
 
 import { privateServices, privateSessionId, session } from './private'
 
 export const isCalculationInProgress = ref(false)
 
-// PIN availability is derived from the session (which derives it from
-// storage), not snapshotted — so it cannot go stale behind a setter nobody
-// remembered to call. The ref only exists to re-evaluate on session changes.
+// PIN availability is derived from the custody's storage — never a stale
+// copy. The refs exist only to re-evaluate on changes: the session fires on
+// enter/exit/mode, the custody on store/revoke/mode (no manual touch calls).
 export const sessionRevision = ref(0)
 
 session.subscribe(() => {
   sessionRevision.value += 1
 })
 
+pinCustody.subscribe(() => {
+  sessionRevision.value += 1
+})
+
 export const isOnlinePinSet = computed(
-  () => sessionRevision.value >= 0 && session.isOnlinePinSet(),
+  () => sessionRevision.value >= 0 && pinCustody.isSet('online'),
 )
 
 export const isOfflinePinSet = computed(
-  () => sessionRevision.value >= 0 && session.isOfflinePinSet(),
+  () => sessionRevision.value >= 0 && pinCustody.isSet('offline'),
 )
 
 export const sessionId = computed(() => privateSessionId.value)

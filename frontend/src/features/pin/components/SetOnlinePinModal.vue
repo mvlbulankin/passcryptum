@@ -9,13 +9,13 @@ import {
   useLoadingBar,
 } from 'naive-ui'
 import { ref } from 'vue'
-import { MIN_PIN_LENGTH, isForbidden, setOnlinePin } from '#/core'
+import { MIN_PIN_LENGTH, pinCustody } from '#/core'
 import { KeyOutline, LockClosedOutline } from '@vicons/ionicons5'
 
 import { FormSubmit } from '@/shared'
 import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
 import { isCalculationInProgress } from '@/entities/session'
-import { session, touchSession, showSetOnlinePinModal } from '../model'
+import { session, showSetOnlinePinModal } from '../model'
 
 const pin = ref('')
 
@@ -27,6 +27,17 @@ const clearForm = () => {
   pin.value = ''
 }
 
+const stop = () => {
+  loadingBar.finish()
+  isCalculationInProgress.value = false
+}
+
+const fail = () => {
+  loadingBar.error()
+  message.error('Failed to set online PIN')
+  isCalculationInProgress.value = false
+}
+
 const onSubmit = () => {
   if (pin.value.length < MIN_PIN_LENGTH) {
     message.error(`PIN must be at least ${MIN_PIN_LENGTH} characters`)
@@ -35,37 +46,24 @@ const onSubmit = () => {
   }
 
   loadingBar.start()
-  setOnlinePin(session, localStorage, pin.value)
+  isCalculationInProgress.value = true
+
+  pinCustody
+    .store('online', pin.value, session.originBuffer())
     .then(result => {
-      if (result.success) {
-        touchSession()
+      if (result.ok) {
         message.success('Online PIN has been set')
-        loadingBar.finish()
-        isCalculationInProgress.value = false
+        stop()
         showSetOnlinePinModal.value = false
         clearForm()
-      } else if (result.reason === '403') {
-        loadingBar.finish()
-        isCalculationInProgress.value = false
-        showSetOnlinePinModal.value = false
-        clearForm()
-      }
-    })
-    .catch(e => {
-      if (isForbidden(e)) {
+      } else if (result.reason === 'unknownProfile') {
+        stop()
         showPublicKeyError(dialog)
-        loadingBar.finish()
-        isCalculationInProgress.value = false
-
-        return
+      } else {
+        fail()
       }
-
-      void e
-
-      loadingBar.error()
-      message.error('Failed to set online PIN')
-      isCalculationInProgress.value = false
     })
+    .catch(fail)
 }
 </script>
 

@@ -3,8 +3,9 @@
 // behind the seam.
 
 import type { Vault } from '../../vault'
+import type { CustodyMode, CustodyReason, PinCustody } from '../../pin'
 
-export type SessionMode = 'online' | 'offline'
+export type SessionMode = CustodyMode
 
 /** Persistence the session needs. localStorage satisfies it. */
 export type SessionStorage = {
@@ -15,6 +16,8 @@ export type SessionStorage = {
 
 export type SessionDeps = {
   storage?: SessionStorage
+  /** The PIN Custody that holds the Origin Buffer between sessions. */
+  custody?: PinCustody
 }
 
 /** What a caller learns from a successful entry. */
@@ -51,12 +54,16 @@ export type Session = {
   mode(): SessionMode
   setMode(mode: SessionMode): void
 
-  /** PIN availability, derived from storage — never a stale copy. */
-  isOnlinePinSet(): boolean
-  isOfflinePinSet(): boolean
-
   hasVisited(): boolean
   markVisited(): void
+}
+
+/** enterWithPin failed; the reason is the custody's closed vocabulary. */
+export class PinReleaseError extends Error {
+  constructor(public readonly reason: CustodyReason) {
+    super(`PIN release failed: ${reason}`)
+    this.name = 'PinReleaseError'
+  }
 }
 
 /** Use of a session that has ended: nothing secret is available any more. */

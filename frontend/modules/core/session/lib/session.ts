@@ -2,30 +2,20 @@ import { stringify } from '../../../services'
 
 import { createVault, type Vault } from '../../vault'
 import {
-  base64ToBuffer,
   createAesKey,
-  decrypt,
   getBufferOfText,
+  getKeyPairFromSeed,
+  parseOriginBuffer,
   pbkdf2,
   uint8ArrayToBase64,
-  getKeyPairFromSeed,
 } from '../../shared'
+import { pinCustody } from '../../pin'
 import {
   ORIGIN_BUFFER_BYTE_LENGTH,
   ORIGIN_BUFFER_ITERATIONS,
-  LS_KEY_PROTECTOR,
-  LS_KEY_PUBLIC_KEY,
-  LS_KEY_RANDOM_STRING,
-  LS_KEY_MODE,
   LS_KEY_VISITED,
 } from '../../constants'
-import {
-  getEncryptedHash,
-  getEncryptedOnlineHash,
-  createPinAesData,
-} from '../../actions'
-import { parseOriginBuffer } from './origin-buffer'
-import { SessionClosedError } from './types'
+import { SessionClosedError, PinReleaseError } from './types'
 import type {
   Session,
   SessionDeps,
@@ -36,12 +26,15 @@ import type {
 
 /**
  * Creates a session over a storage. The session owns everything that belongs
- * to "being logged in": the derailed secret material, the vault, the mode
- * and the PIN flags. Consumers read narrow accessors instead of a record of
- * raw buffers, so nothing can reach a secret after exit().
+ * to "being logged in": the derailed secret material, the vault and the
+ * visited flag. Consumers read narrow accessors instead of a record of raw
+ * buffers, so nothing can reach a secret after exit(). PIN custody and the
+ * online/offline mode are delegated to the injected custody (GLOSSARY:
+ * PIN Custody).
  */
 export const createSession = (deps: SessionDeps = {}): Session => {
   const storage = deps.storage ?? localStorage
+  const custody = deps.custody ?? pinCustody
 
   let state: {
     originBuffer: ArrayBuffer
@@ -111,23 +104,15 @@ export const createSession = (deps: SessionDeps = {}): Session => {
   }
 
   const enterWithPin = async (pin: string): Promise<StarterKit> => {
-    // PIN entry means "pull the encrypted Origin Buffer from wherever it is
-    // kept, decrypt it with the PIN". Offline: local storage. Online: the
-    // server, via the wire client and this profile's protector.
-    const offlineHash = getEncryptedHash(storage)
+    // PIN entry means "pull the encrypted Origin Buffer from wherever the
+    // custody keeps it" — the custody alone knows where that is.
+    const released = await custody.release(pin)
 
-    const encrypted =
-      mode() === 'online'
-        ? await getEncryptedOnlineHash(pin, storage)
-        : offlineHash && base64ToBuffer(offlineHash)
-
-    if (!encrypted) {
-      throw new Error('No encrypted origin buffer available')
+    if (!released.ok) {
+      throw new PinReleaseError(released.reason)
     }
 
-    const { iv, key } = await createPinAesData(pin, storage)
-
-    return start(await decrypt(iv, key, encrypted))
+    return start(released.buffer)
   }
 
   const exit = () => {
@@ -147,25 +132,15 @@ export const createSession = (deps: SessionDeps = {}): Session => {
     notify()
   }
 
-  const mode = (): SessionMode => {
-    const stored = storage.getItem(LS_KEY_MODE)
-
-    return stored === 'Online' ? 'online' : 'offline'
-  }
+  // The mode lives in the custody: it is the answer to "where does the
+  // login material come from". The session keeps it on its interface
+  // because the app-level online/offline switch speaks through the session.
+  const mode = (): SessionMode => custody.mode()
 
   const setMode = (next: SessionMode) => {
-    storage.setItem(LS_KEY_MODE, next === 'online' ? 'Online' : 'Offline')
+    custody.setMode(next)
     notify()
   }
-
-  const isOnlinePinSet = () =>
-    Boolean(
-      storage.getItem(LS_KEY_PUBLIC_KEY) &&
-      storage.getItem(LS_KEY_PROTECTOR) &&
-      storage.getItem(LS_KEY_RANDOM_STRING),
-    )
-
-  const isOfflinePinSet = () => Boolean(getEncryptedHash(storage))
 
   return {
     enter,
@@ -189,8 +164,6 @@ export const createSession = (deps: SessionDeps = {}): Session => {
     vault: () => active().vault,
     mode,
     setMode,
-    isOnlinePinSet,
-    isOfflinePinSet,
     hasVisited: () =>
       state !== null &&
       storage.getItem(LS_KEY_VISITED) ===

@@ -1,13 +1,12 @@
 import { computed } from 'vue'
 import { useMessage, useDialog, useLoadingBar } from 'naive-ui'
-import { deleteOnlinePin, deleteOfflinePin, isForbidden } from '#/core'
+import { pinCustody } from '#/core'
 
 import {
   isOnlinePinSet,
   isOfflinePinSet,
   isCalculationInProgress,
 } from '@/entities/session'
-import { touchSession } from '../model'
 import { showPublicKeyError } from '@/features/storage/lib/public-key-error'
 
 export const useDeleteOnlinePin = () => {
@@ -29,23 +28,23 @@ export const useDeleteOnlinePin = () => {
           loadingBar.start()
 
           try {
-            // The request must settle before the UI claims success: the
-            // old code fired the message while the request was in flight.
-            const revoked = await deleteOnlinePin(localStorage)
+            const revoked = await pinCustody.revoke('online')
 
-            if (!revoked) {
-              showPublicKeyError(dialog)
-            } else {
+            if (revoked.ok) {
               message.info('Your online PIN has been deleted')
-            }
-          } catch (e) {
-            if (isForbidden(e)) {
+            } else if (
+              revoked.reason === 'unknownCredential' ||
+              revoked.reason === 'unknownProfile'
+            ) {
+              // The credential (or the profile) is gone server-side; the
+              // device's record cannot be used to revoke what is not there.
               showPublicKeyError(dialog)
             } else {
               message.error('Failed to delete the online PIN')
             }
           } finally {
-            touchSession()
+            // The custody notified its subscribers: PIN availability
+            // re-derives without a manual touch.
             loadingBar.finish()
           }
         },
@@ -55,9 +54,9 @@ export const useDeleteOnlinePin = () => {
 }
 
 export const useDeleteOfflinePin = () => {
-  const dialog = useDialog()
   const message = useMessage()
   const loadingBar = useLoadingBar()
+  const dialog = useDialog()
 
   return {
     isDeleteOfflinePinDisabled: computed(
@@ -71,8 +70,8 @@ export const useDeleteOfflinePin = () => {
         negativeText: 'Cancel',
         onPositiveClick() {
           loadingBar.start()
-          deleteOfflinePin(localStorage)
-          touchSession()
+
+          pinCustody.revoke('offline')
           message.info('Your offline PIN has been deleted')
           requestAnimationFrame(() => loadingBar.finish())
         },

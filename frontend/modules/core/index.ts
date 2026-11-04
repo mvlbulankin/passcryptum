@@ -7,12 +7,12 @@
 // The surface is grouped by intent, not by file:
 //   session  — who is logged in and what the vault is
 //   wire     — the only way to talk to the server
-//   pin      — storing/releasing the Origin Buffer under a PIN
+//   pin      — PIN Custody: holding the Origin Buffer under a PIN
 //   crypto   — primitives the app composes itself (transport, generation)
 
-export { createSession, SessionClosedError } from './session'
+export { createSession, SessionClosedError, PinReleaseError } from './session'
 
-export type { Session, SessionMode, StarterKit } from './session'
+export type { Session, SessionDeps, SessionMode, StarterKit } from './session'
 
 export { wire, WireError, isForbidden } from './wire'
 
@@ -33,9 +33,18 @@ export {
   uint8ArrayToBase64,
 } from './shared'
 
-export {
-  setOnlinePin,
-  setOfflinePin,
-  deleteOnlinePin,
-  deleteOfflinePin,
+export { pinCustody, createPinCustody } from './pin'
+
+export type {
+  PinCustody,
+  CustodyKind,
+  CustodyMode,
+  CustodyReason,
+  StoreOutcome,
+  ReleaseOutcome,
+  RevokeOutcome,
 } from './pin'
+
+// The Origin Buffer layout is shared by the session and the custody; it
+// lives with the crypto primitives, not in either consumer.
+export { parseOriginBuffer } from './shared'

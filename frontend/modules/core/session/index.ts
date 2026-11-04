@@ -4,7 +4,7 @@
 
 export { createSession } from './lib/session'
 
-export { SessionClosedError } from './lib/types'
+export { SessionClosedError, PinReleaseError } from './lib/types'
 
 export type {
   Session,
